@@ -5,19 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>HAEYI SCHEDULER</title>
 <link rel="manifest" id="manifest-link" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" />
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin:0; padding:0; }
-body { font-family:'Noto Sans KR', sans-serif; background:#F4F3F8; color:#33313D; min-height:100vh; padding: 20px 16px 56px; }
+body { font-family:'Noto Sans KR', sans-serif; background:#FAF8F3; color:#4A4238; min-height:100vh; padding: 20px 16px 56px; }
 button, input { font-family: inherit; }
 #app { max-width: 720px; margin: 0 auto; }
 
 .header { margin-bottom: 18px; }
 .brand-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.brand-title { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:22px; color:#33313D; margin:0; }
+.brand-title { font-family:'Jua', sans-serif; font-weight:400; font-size:26px; color:#4A4238; margin:0; }
 .brand-edit-btn { border:none; background:#F0EAD9; color:#8A7F6E; border-radius:8px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; padding:0; }
-.brand-edit-input { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:22px; border:none; border-bottom:2px solid #FF6B4A; outline:none; background:transparent; color:#4A4238; padding:2px; width:200px; }
+.brand-edit-input { font-family:'Jua', sans-serif; font-weight:400; font-size:22px; border:none; border-bottom:2px solid #FF6B4A; outline:none; background:transparent; color:#4A4238; padding:2px; width:200px; }
 .brand-sub { font-size:12.5px; color:#9C9282; margin:4px 0 0; }
 
 .sync-row { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
@@ -29,11 +31,10 @@ button, input { font-family: inherit; }
 .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#4A4238; color:#fff; padding:10px 18px; border-radius:999px; font-size:13px; font-weight:600; z-index:200; opacity:0; transition:opacity .2s ease; pointer-events:none; }
 .toast.show { opacity:1; }
 
-.kid-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-top:14px; align-items:center; background:#fff; padding:6px; border-radius:18px; box-shadow:0 2px 10px rgba(40,40,80,0.05); }
-.kid-tab { position:relative; display:flex; flex:1 1 auto; align-items:center; justify-content:center; gap:6px; padding:10px 13px; border-radius:14px; font-weight:700; font-size:13.5px; border:none; cursor:pointer; background:transparent; color:#A2A2B3; transition:background .2s ease, color .2s ease; }
-.kid-tab.active { background: var(--kc-border); color:#fff; box-shadow:0 4px 10px -2px var(--kc-border); }
+.kid-tabs { display:flex; gap:7px; flex-wrap:wrap; margin-top:14px; align-items:center; }
+.kid-tab { position:relative; display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; font-weight:600; font-size:13.5px; border:1.5px solid transparent; cursor:pointer; background:#fff; color:#8A7F6E; }
+.kid-tab.active { border-color: var(--kc-border); background: var(--kc-bg); color: var(--kc-text); }
 .kid-tab .dot { width:7px; height:7px; border-radius:50%; background:var(--kc-border); }
-.kid-tab.active .dot { background:#fff; }
 .kid-tab-del { opacity:0.5; margin-left:1px; display:flex; }
 .alert-dot { position:absolute; top:-3px; right:-3px; width:12px; height:12px; border-radius:50%; background:#E5383B; border:2px solid #FAF8F3; }
 .kid-name-blink { animation: kidNameBlink 1.2s ease-in-out infinite; font-weight:800; }
@@ -50,7 +51,7 @@ button, input { font-family: inherit; }
 .add-kid-inline button { border:none; background:#FF6B4A; color:#fff; border-radius:999px; padding:6px 13px; font-size:12.5px; font-weight:600; cursor:pointer; }
 
 .empty-state { background:#fff; border:2px dashed #DCD3C0; border-radius:22px; padding:40px 20px; text-align:center; color:#9C9282; margin-top:18px; }
-.empty-state h3 { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:18px; color:#4A4238; margin:0 0 6px; }
+.empty-state h3 { font-family:'Jua', sans-serif; font-weight:400; font-size:18px; color:#4A4238; margin:0 0 6px; }
 
 .view-switch { display:flex; gap:3px; background:#F0EAD9; padding:4px; border-radius:999px; width:fit-content; margin:16px 0 14px; overflow-x:auto; max-width:100%; }
 .mode-toggle { display:flex; gap:3px; background:#F0EAD9; padding:3px; border-radius:999px; width:fit-content; margin:0 14px 10px; }
@@ -65,7 +66,7 @@ button, input { font-family: inherit; }
   50% { background:#FFD2D2; color:#991B1B; }
 }
 
-.panel { background:#fff; border-radius:22px; border:none; overflow:hidden; box-shadow:0 2px 16px rgba(40,40,80,0.06); }
+.panel { background:#fff; border-radius:20px; border:1px solid #F0EAD9; overflow:hidden; box-shadow:0 3px 12px rgba(154,130,80,0.06); }
 
 .hw-add-form { margin:14px 14px 0; background:#FBF9F4; border-radius:14px; padding:12px 14px; }
 .hw-add-form .time-row input[type="date"] { border:1.5px solid #E8DFCB; border-radius:11px; padding:8px 10px; font-size:16px; font-family:inherit; }
@@ -86,7 +87,7 @@ button, input { font-family: inherit; }
 .week-toolbar { display:flex; align-items:center; gap:8px; padding:13px 14px; border-bottom:1px solid #F0EAD9; flex-wrap:wrap; }
 .week-nav { display:flex; gap:4px; }
 .week-nav button { border:1px solid #E8DFCB; background:#fff; border-radius:10px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#8A7F6E; flex-shrink:0; }
-.week-label { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:14.5px; }
+.week-label { font-family:'Jua', sans-serif; font-weight:400; font-size:14.5px; }
 .today-btn { margin-left:auto; border:1px solid #E8DFCB; background:#fff; color:#8A7F6E; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 
 .legend { display:flex; gap:12px; padding:10px 14px 0; flex-wrap:wrap; font-size:11px; color:#8A7F6E; }
@@ -153,7 +154,7 @@ button, input { font-family: inherit; }
 .day-tab .tab-date { font-size:9px; font-weight:600; color:#B5AA96; }
 
 .sched-header { display:flex; justify-content:space-between; align-items:center; padding:4px 14px 10px; flex-wrap:wrap; gap:8px; }
-.sched-header .daylabel { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:15px; }
+.sched-header .daylabel { font-family:'Jua', sans-serif; font-weight:400; font-size:15px; }
 .recur-tag { font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px; margin-left:4px; }
 .recur-tag.fixed { background:#EAF6FF; color:#0E4A78; }
 .recur-tag.once { background:#FFF1EC; color:#99311C; }
@@ -220,7 +221,7 @@ button, input { font-family: inherit; }
 
 .lock-screen { display:flex; flex-direction:column; align-items:center; text-align:center; padding:40px 24px; gap:4px; }
 .lock-icon { width:44px; height:44px; border-radius:50%; background:#F0EAD9; color:#8A7F6E; display:flex; align-items:center; justify-content:center; margin-bottom:6px; font-size:20px; }
-.lock-screen h3 { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:17px; margin:0; }
+.lock-screen h3 { font-family:'Jua', sans-serif; font-weight:400; font-size:17px; margin:0; }
 .lock-screen p { font-size:12.5px; color:#9C9282; margin:2px 0 14px; }
 .lock-input { width:100%; max-width:240px; border:1.5px solid #E8DFCB; border-radius:12px; padding:10px 12px; font-size:16px; outline:none; margin-bottom:8px; text-align:center; letter-spacing:2px; }
 .lock-error { color:#E5383B; font-size:12px; font-weight:600; margin-bottom:6px; }
@@ -229,7 +230,7 @@ button, input { font-family: inherit; }
 .pay-summary { display:flex; gap:10px; padding:12px 14px 4px; flex-wrap:wrap; }
 .pay-metric { flex:1; min-width:130px; background:#FBF9F4; border-radius:14px; padding:12px 14px; }
 .pay-metric-label { display:block; font-size:11.5px; color:#8A7F6E; font-weight:600; margin-bottom:4px; }
-.pay-metric-value { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:19px; color:#4A4238; }
+.pay-metric-value { font-family:'Jua', sans-serif; font-weight:400; font-size:19px; color:#4A4238; }
 .weekly-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px; margin-left:4px; background:#F1EFFE; color:#3B2E99; }
 .weekly-badge-edit { display:inline-flex; align-items:center; gap:2px; }
 .weekly-badge-edit input { width:42px; border:none; background:transparent; color:#3B2E99; font-weight:700; font-size:16px; padding:0; text-align:center; -moz-appearance:textfield; transform:scale(0.62); transform-origin:center; margin:0 -8px; }
@@ -261,7 +262,7 @@ button, input { font-family: inherit; }
 
 .modal-overlay { position:fixed; inset:0; background:rgba(74,66,56,0.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:16px; }
 .modal { background:#fff; border-radius:20px; width:100%; max-width:380px; padding:20px; max-height:90vh; overflow-y:auto; }
-.modal h3 { font-family:'Noto Sans KR', sans-serif; font-weight:800; letter-spacing:-0.3px; font-size:18px; margin:0 0 14px; display:flex; justify-content:space-between; align-items:center; }
+.modal h3 { font-family:'Jua', sans-serif; font-weight:400; font-size:18px; margin:0 0 14px; display:flex; justify-content:space-between; align-items:center; }
 .modal-close { border:none; background:#F5EFE0; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#8A7F6E; flex-shrink:0; }
 .field { margin-bottom:13px; }
 .field label { display:block; font-size:12px; font-weight:600; color:#8A7F6E; margin-bottom:5px; }
@@ -293,22 +294,6 @@ button, input { font-family: inherit; }
 .modal-actions { display:flex; gap:8px; margin-top:16px; }
 .btn-primary { flex:1; border:none; background:#FF6B4A; color:#fff; padding:11px; border-radius:13px; font-weight:600; font-size:13.5px; cursor:pointer; }
 .btn-danger { border:none; background:#FDEAEA; color:#B0342F; padding:11px 14px; border-radius:13px; font-weight:600; font-size:13.5px; cursor:pointer; }
-
-/* ---------- 오늘의 달성률 + 체크 애니메이션 ---------- */
-.progress-card { display:flex; align-items:center; gap:16px; padding:16px 18px; margin:0 0 2px; }
-.progress-ring-wrap { position:relative; width:72px; height:72px; flex-shrink:0; }
-.progress-ring-center { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:var(--kc-text); }
-.progress-info { flex:1; min-width:0; }
-.progress-title { font-size:12px; font-weight:700; color:#9C9282; }
-.progress-count { font-size:15.5px; font-weight:800; color:#4A4238; margin-top:2px; }
-.progress-count b { color:var(--kc-border); }
-.progress-sub { font-size:11.5px; color:#B5AA96; margin-top:3px; font-weight:600; }
-.stamp-pop { animation:stampPop .45s cubic-bezier(.34,1.6,.64,1); }
-@keyframes stampPop {
-  0% { transform:scale(0.55); }
-  60% { transform:scale(1.16); }
-  100% { transform:scale(1); }
-}
 </style>
 </head>
 <body>
@@ -333,7 +318,6 @@ var TYPE_COLOR = {
   "학원": { bg:"#FFE3C7", border:"#EA580C", text:"#9A3412" },
   "보강": { bg:"#FCE1EF", border:"#DB2777", text:"#9D174D" }
 };
-var TYPE_EMOJI = { "학교":"🏫", "방과후":"🎨", "학원":"📚", "보강":"🔁" };
 var ABSENT_COLOR = { bg:"#FFD2D2", border:"#DC2626", text:"#991B1B" };
 var ATT_CYCLE = [null, "출석", "결석", "조퇴"];
 var ATT_STYLE = {
@@ -371,7 +355,6 @@ function esc(s){ if (s===undefined||s===null) return ""; return String(s).replac
 /* ---------- 데이터 ---------- */
 var DATA = { kids:[], classes:[], attendance:{}, homework:{}, supplies:{}, calendarNotes:[], holidays:[], homeworkItems:[], appTitle:"HAEYI SCHEDULER", paymentPassword:null, updatedAt:0 };
 var syncStatus = "connecting";
-var ACTIVE_PULSE_KEY = null;
 
 function normalizeClass(c){
   var hasRecurInfo = c.recurring !== undefined;
@@ -396,17 +379,19 @@ function normalizeClass(c){
     cycleWeekdays: Array.isArray(c.cycleWeekdays) ? c.cycleWeekdays : []
   });
 }
-function normalizeAll(){
-  DATA.kids = DATA.kids || [];
-  DATA.classes = (DATA.classes || []).map(normalizeClass);
-  DATA.attendance = DATA.attendance || {};
-  DATA.homework = DATA.homework || {};
-  DATA.supplies = DATA.supplies || {};
-  DATA.calendarNotes = DATA.calendarNotes || [];
-  DATA.holidays = DATA.holidays || [];
-  DATA.homeworkItems = DATA.homeworkItems || [];
-  if (!DATA.appTitle) DATA.appTitle = "HAEYI SCHEDULER";
+function normalizeData(d){
+  d.kids = d.kids || [];
+  d.classes = (d.classes || []).map(normalizeClass);
+  d.attendance = d.attendance || {};
+  d.homework = d.homework || {};
+  d.supplies = d.supplies || {};
+  d.calendarNotes = d.calendarNotes || [];
+  d.holidays = d.holidays || [];
+  d.homeworkItems = d.homeworkItems || [];
+  if (!d.appTitle) d.appTitle = "HAEYI SCHEDULER";
+  return d;
 }
+function normalizeAll(){ normalizeData(DATA); invalidateIdx(); }
 
 /* ---------- UI 상태 (기기별, 저장 안 됨) ---------- */
 var ui = {
@@ -424,8 +409,7 @@ var ui = {
   needsSetup: false, setupUrlInput: "",
   gridDayGroup: "weekday",
   hwAddDate: todayStr(), hwAddText: "",
-  adminUnlocked: false, showAdminPrompt: false,
-  stampPulse: null
+  adminUnlocked: false, showAdminPrompt: false
 };
 
 /* ---------- 동기화 (Firebase Realtime Database, 로그인 불필요 — 부모님이 최초 1회만 설정) ---------- */
@@ -442,7 +426,7 @@ function normalizeFbUrl(u){
   return u;
 }
 function remoteGet(){
-  return fetch(fbUrl + "family-data.json").then(function(res){
+  return fetch(fbUrl + "family-data.json", { cache:"no-store" }).then(function(res){
     if (!res.ok) throw new Error("데이터 조회 실패 (status " + res.status + ")");
     return res.text();
   }).then(function(text){
@@ -450,8 +434,15 @@ function remoteGet(){
     return text;
   });
 }
+// 전체 데이터 대신 updatedAt 숫자 하나만 받아와서 바뀌었는지 확인 (폴링 트래픽 절감)
+function remoteGetTs(){
+  return fetch(fbUrl + "family-data/updatedAt.json", { cache:"no-store" }).then(function(res){
+    if (!res.ok) throw new Error("데이터 조회 실패 (status " + res.status + ")");
+    return res.json();
+  }).then(function(v){ return Number(v) || 0; });
+}
 function remoteSet(text){
-  return fetch(fbUrl + "family-data.json", {
+  return fetch(fbUrl + "family-data.json?print=silent", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: text
@@ -459,19 +450,147 @@ function remoteSet(text){
     if (!res.ok) throw new Error("데이터 저장 실패 (status " + res.status + ")");
   });
 }
+// 바뀐 항목만 전송 — 다른 기기가 동시에 체크한 출석·숙제를 덮어쓰지 않음
+function remotePatch(text){
+  return fetch(fbUrl + "family-data.json?print=silent", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: text
+  }).then(function(res){
+    if (!res.ok) throw new Error("데이터 저장 실패 (status " + res.status + ")");
+  });
+}
+
+/* 서버와 마지막으로 맞춘 상태(baseline)를 키별 JSON 문자열로 기억해 두고, 지금 DATA와 비교해 바뀐 부분만 PATCH 한다.
+   attendance/homework/supplies는 항목 단위, 나머지는 최상위 키 단위로 비교. */
+var MAP_KEYS = { attendance:1, homework:1, supplies:1 };
+var SAFE_KEY = /^[^.$#\[\]\/]+$/;
+var BASE_KEY = "family-schedule-sync-base";
+var baseline = null, lastSeenTs = 0;
+var initialDone = false, initialRunning = false, saving = false, pollingStarted = false, needsRender = false, syncToastShown = false;
+
+function snapshotOf(d){
+  var s = {};
+  Object.keys(d).forEach(function(k){
+    if (k === "updatedAt" || d[k] === undefined) return;
+    if (MAP_KEYS[k] && d[k] && typeof d[k] === "object") {
+      var m = s[k] = {};
+      Object.keys(d[k]).forEach(function(e){ m[e] = JSON.stringify(d[k][e]); });
+    } else s[k] = JSON.stringify(d[k]);
+  });
+  return s;
+}
+function diffOps(){
+  var ops = {};
+  if (!baseline) return ops;
+  var keys = {};
+  Object.keys(baseline).concat(Object.keys(DATA)).forEach(function(k){ if (k !== "updatedAt") keys[k] = 1; });
+  Object.keys(keys).forEach(function(k){
+    var cur = DATA[k], base = baseline[k];
+    if (MAP_KEYS[k] && cur && typeof cur === "object") {
+      var b = (base && typeof base === "object") ? base : {};
+      var changed = [];
+      Object.keys(cur).forEach(function(e){ if (JSON.stringify(cur[e]) !== b[e]) changed.push([e, cur[e]]); });
+      Object.keys(b).forEach(function(e){ if (!(e in cur)) changed.push([e, null]); });
+      if (!changed.length) return;
+      // Firebase 경로에 쓸 수 없는 문자가 섞인 키가 있으면 그 묶음만 통째로 교체
+      if (changed.some(function(c){ return !SAFE_KEY.test(c[0]); })) ops[k] = cur;
+      else changed.forEach(function(c){ ops[k+"/"+c[0]] = c[1]; });
+    } else {
+      var v = cur === undefined ? undefined : JSON.stringify(cur);
+      if (v !== base) ops[k] = cur === undefined ? null : cur;
+    }
+  });
+  return ops;
+}
+function hasLocalChanges(){ return Object.keys(diffOps()).length > 0; }
+// stringify=true 이면 baseline(문자열 스냅샷)에, false 이면 실제 데이터 객체에 적용
+function applyOps(d, ops, stringify){
+  Object.keys(ops).forEach(function(p){
+    var v = ops[p], slash = p.indexOf("/");
+    if (slash === -1) {
+      if (v === null) delete d[p];
+      else if (stringify && MAP_KEYS[p]) { var m = {}; Object.keys(v).forEach(function(e){ m[e] = JSON.stringify(v[e]); }); d[p] = m; }
+      else d[p] = stringify ? JSON.stringify(v) : v;
+    } else {
+      var k = p.slice(0, slash), e = p.slice(slash+1);
+      if (!d[k] || typeof d[k] !== "object") d[k] = {};
+      if (v === null) delete d[k][e];
+      else d[k][e] = stringify ? JSON.stringify(v) : v;
+    }
+  });
+}
+function saveBaseline(){
+  try { localStorage.setItem(BASE_KEY, JSON.stringify({ url:fbUrl, ts:lastSeenTs, snap:baseline })); } catch(e){}
+}
+function loadBaseline(){
+  try {
+    var b = JSON.parse(localStorage.getItem(BASE_KEY));
+    if (b && b.url === fbUrl && b.snap) { baseline = b.snap; lastSeenTs = b.ts || 0; }
+  } catch(e){}
+}
+function adoptRemote(remote){
+  DATA = remote; ensureSelectedKid(); saveLocalBackup(); invalidateIdx();
+}
+function requestRender(){
+  if (isUserTyping()) { needsRender = true; return; }
+  render();
+}
 
 var saveTimer = null;
 function scheduleSave(){
+  invalidateIdx();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(doSave, 300);
 }
 function doSave(){
+  clearTimeout(saveTimer); saveTimer = null;
   DATA.updatedAt = Date.now();
   saveLocalBackup();
-  if (!fbUrl) return;
-  remoteSet(JSON.stringify(DATA)).then(function(){
-    syncStatus = "synced"; renderSyncBadge();
+  if (!fbUrl || !baseline || !initialDone || saving) return;
+  if (!hasLocalChanges()) return;
+  saving = true;
+  remoteGetTs().then(function(ts){
+    if (ts === lastSeenTs) return;
+    // 그 사이 다른 기기가 저장함 → 서버 최신본을 받아서 그 위에 내 변경분만 다시 얹는다
+    return remoteGet().then(function(text){
+      var mine = JSON.parse(JSON.stringify(diffOps()));
+      if (!text) { baseline = {}; lastSeenTs = 0; return; }
+      var remote = normalizeData(JSON.parse(text));
+      baseline = snapshotOf(remote);
+      lastSeenTs = Number(remote.updatedAt) || 0;
+      applyOps(remote, mine, false);
+      normalizeData(remote);
+      remote.updatedAt = DATA.updatedAt;
+      adoptRemote(remote);
+      requestRender();
+    });
+  }).then(function(){
+    var ops = diffOps();
+    if (!Object.keys(ops).length) return;
+    var text = JSON.stringify(Object.assign({}, ops, { updatedAt: DATA.updatedAt }));
+    return remotePatch(text).then(function(){
+      var sent = JSON.parse(text);
+      lastSeenTs = sent.updatedAt;
+      delete sent.updatedAt;
+      applyOps(baseline, sent, true);
+    }, function(e){
+      if (!(e instanceof TypeError)) throw e;
+      // PATCH 요청이 막히는 환경(브라우저/보안프로그램) → 예전처럼 전체 저장으로 대체
+      var full = JSON.stringify(DATA);
+      return remoteSet(full).then(function(){
+        var d = JSON.parse(full);
+        lastSeenTs = Number(d.updatedAt) || 0;
+        baseline = snapshotOf(d);
+      });
+    });
+  }).then(function(){
+    saving = false;
+    saveBaseline();
+    syncStatus = "synced"; lastSyncError = ""; renderSyncBadge();
+    if (hasLocalChanges()) scheduleSave();
   }).catch(function(e){
+    saving = false;
     lastSyncError = errText(e);
     syncStatus = "error"; renderSyncBadge();
   });
@@ -490,32 +609,48 @@ function saveLocalBackup(){
   try { localStorage.setItem("family-schedule-local-backup", JSON.stringify(DATA)); } catch(e){}
 }
 function pollOnce(){
-  if (!fbUrl || ui.modal) return;
-  remoteGet().then(function(text){
-    if (!text) return;
-    var remote;
-    try { remote = JSON.parse(text); } catch(e) { return; }
-    if (remote.updatedAt && remote.updatedAt > DATA.updatedAt) {
-      DATA = remote; normalizeAll(); ensureSelectedKid(); saveLocalBackup();
-      syncStatus = "synced";
-      render();
-    } else if (DATA.updatedAt > (remote.updatedAt || 0)) {
-      // local has changes the server never received (e.g. a previous save failed) - retry pushing
-      remoteSet(JSON.stringify(DATA)).then(function(){
-        syncStatus = "synced"; renderSyncBadge();
-      }).catch(function(e){ lastSyncError = errText(e); syncStatus = "error"; renderSyncBadge(); });
-    } else if (syncStatus === "error") {
-      syncStatus = "synced";
-      renderSyncBadge();
+  if (!fbUrl || saving || ui.modal) return;
+  if (!initialDone) { initialSync(); return; }
+  remoteGetTs().then(function(ts){
+    if (hasLocalChanges()) { doSave(); return; }   // 못 보낸 변경분이 있으면 doSave가 병합까지 처리
+    if (ts === lastSeenTs) {
+      if (syncStatus === "error") { syncStatus = "synced"; renderSyncBadge(); }
+      return;
     }
+    return remoteGet().then(function(text){
+      if (!text || saving || hasLocalChanges()) return;
+      var remote = normalizeData(JSON.parse(text));
+      baseline = snapshotOf(remote);
+      lastSeenTs = Number(remote.updatedAt) || 0;
+      adoptRemote(remote); saveBaseline();
+      syncStatus = "synced";
+      requestRender();
+    });
   }).catch(function(e){ lastSyncError = errText(e); syncStatus = "error"; renderSyncBadge(); });
 }
+var lastTickSig = "";
+function tickSig(){
+  return todayStr() + "|" + DATA.kids.map(function(k){ return kidNeedsArrivalAlert(k.id) ? 1 : 0; }).join("");
+}
 function startPolling(){
+  if (pollingStarted) return;
+  pollingStarted = true;
   setInterval(function(){
     if (document.hidden || isUserTyping()) return;
+    if (needsRender) render();
     pollOnce();
   }, 15000);
-  document.addEventListener("visibilitychange", function(){ if (!document.hidden) pollOnce(); });
+  // 학원 시작 시간이 지나면 이름 깜빡임/알림이 화면을 다시 그리지 않아도 뜨도록 1분마다 확인
+  setInterval(function(){
+    if (document.hidden || isUserTyping() || ui.modal || ui.noteModal || ui.dupModal || ui.showAdminPrompt || ui.needsSetup) return;
+    var s = tickSig();
+    if (s !== lastTickSig) { lastTickSig = s; render(); }
+  }, 60000);
+  document.addEventListener("visibilitychange", function(){
+    if (document.hidden) doSave();
+    else pollOnce();
+  });
+  window.addEventListener("pagehide", function(){ doSave(); });
 }
 
 function init(){
@@ -531,13 +666,6 @@ function init(){
     try { fbUrl = localStorage.getItem("family-fb-url"); } catch(e){}
   }
   if (!fbUrl) {
-    var localOnly = false;
-    try { localOnly = localStorage.getItem("family-schedule-local-only") === "1"; } catch(e){}
-    if (localOnly) {
-      syncStatus = "local-only";
-      render();
-      return;
-    }
     ui.needsSetup = true;
     render();
     return;
@@ -553,15 +681,6 @@ function submitSetup(){
   proceedWithSync();
 }
 
-function skipSetup(){
-  ui.needsSetup = false;
-  fbUrl = null;
-  syncStatus = "local-only";
-  try { localStorage.setItem("family-schedule-local-only", "1"); } catch(e){}
-  saveLocalBackup();
-  render();
-}
-
 function proceedWithSync(){
   try { localStorage.setItem("family-fb-url", fbUrl); } catch(e){}
   if (!getFbUrlFromHash()) location.hash = "fb=" + encodeURIComponent(fbUrl);
@@ -572,29 +691,50 @@ function proceedWithSync(){
     syncStatus = "local-only"; renderSyncBadge();
     return;
   }
-
-  syncStatus = "connecting"; renderSyncBadge();
-  remoteGet().then(function(text){
-    if (text) {
-      var remote = JSON.parse(text);
-      DATA = remote; normalizeAll(); ensureSelectedKid(); saveLocalBackup();
-    } else {
-      return remoteSet(JSON.stringify(DATA));
-    }
-  }).then(function(){
-    syncStatus = "synced"; render();
-    showToast("가족과 동기화됐어요! 위의 '공유 링크 복사'를 눌러 가족에게 보내주세요.");
-  }).catch(function(e){
-    lastSyncError = errText(e);
-    syncStatus = "error"; renderSyncBadge();
-  }).then(startPolling);
+  if (!baseline) loadBaseline();
+  initialSync();
+  startPolling();
 }
 
+function initialSync(){
+  if (initialRunning) return;
+  initialRunning = true;
+  syncStatus = "connecting"; renderSyncBadge();
+  remoteGet().then(function(text){
+    if (!text) {
+      return remoteSet(JSON.stringify(DATA)).then(function(){
+        baseline = snapshotOf(DATA); lastSeenTs = Number(DATA.updatedAt) || 0;
+      });
+    }
+    var remote = normalizeData(JSON.parse(text));
+    // 지난번에 이 기기에서 못 올린 변경분(오프라인 등)이 있으면 서버 최신본 위에 다시 얹는다
+    var mine = JSON.parse(JSON.stringify(diffOps()));
+    baseline = snapshotOf(remote);
+    lastSeenTs = Number(remote.updatedAt) || 0;
+    applyOps(remote, mine, false);
+    normalizeData(remote);
+    adoptRemote(remote);
+  }).then(function(){
+    initialRunning = false; initialDone = true;
+    saveBaseline();
+    syncStatus = "synced"; lastSyncError = "";
+    requestRender();
+    if (!syncToastShown) { syncToastShown = true; showToast("가족과 동기화됐어요! 위의 '공유 링크 복사'를 눌러 가족에게 보내주세요."); }
+    if (hasLocalChanges()) doSave();
+  }).catch(function(e){
+    initialRunning = false;
+    lastSyncError = errText(e);
+    syncStatus = "error"; renderSyncBadge();
+  });
+}
+
+var toastTimer = null;
 function showToast(msg){
   var t = document.getElementById("toast");
   t.textContent = msg;
   t.className = "toast show";
-  setTimeout(function(){ t.className = "toast"; }, 3000);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = "toast"; }, 3000);
 }
 function copyShareLink(){
   var url = location.href;
@@ -613,13 +753,37 @@ function isValidOnDate(c, dateForDay){
   if (c.validUntil && dateForDay > c.validUntil) return false;
   return true;
 }
-function classesForDay(kidId, dayIdx, dateForDay){
-  return DATA.classes.filter(function(c){
-    if (c.kidId !== kidId) return false;
-    if (c.recurring) return c.day === dayIdx && isValidOnDate(c, dateForDay);
-    return c.date === dateForDay;
-  }).sort(function(a,b){ return timeToMin(a.start) - timeToMin(b.start); });
+/* 조회용 인덱스: 렌더 한 번에 classesForDay·getHoliday 등이 수백 번 불려서 매번 전체 배열을 훑지 않도록 캐시.
+   데이터가 바뀌면(scheduleSave / render / 서버 데이터 수신) 버리고 다시 만든다. */
+var IDX = null;
+function invalidateIdx(){ IDX = null; }
+function idx(){
+  if (IDX) return IDX;
+  var recur = {}, once = {}, titles = {}, hol = {}, notes = {}, accent = {};
+  DATA.classes.forEach(function(c, i){
+    var k = c.recurring ? c.kidId+"|"+c.day : c.kidId+"|"+c.date;
+    var bucket = c.recurring ? recur : once;
+    (bucket[k] = bucket[k] || []).push({ c:c, i:i });
+    (titles[c.kidId] = titles[c.kidId] || {})[c.title] = true;
+  });
+  Object.keys(titles).forEach(function(kid){
+    var m = accent[kid] = {};
+    Object.keys(titles[kid]).sort().forEach(function(t, i){ m[t] = CLASS_ACCENTS[i % CLASS_ACCENTS.length]; });
+  });
+  DATA.holidays.forEach(function(h){ if (!hol[h.date]) hol[h.date] = h; });
+  DATA.calendarNotes.forEach(function(n){ (notes[n.date] = notes[n.date] || []).push(n); });
+  IDX = { recur:recur, once:once, accent:accent, hol:hol, notes:notes, day:{}, hwCount:{} };
+  return IDX;
 }
+function classesForDay(kidId, dayIdx, dateForDay){
+  var x = idx(), key = kidId+"|"+dayIdx+"|"+dateForDay;
+  if (x.day[key]) return x.day[key];
+  var list = (x.recur[kidId+"|"+dayIdx] || []).filter(function(e){ return isValidOnDate(e.c, dateForDay); })
+    .concat(x.once[kidId+"|"+dateForDay] || []);
+  list.sort(function(a,b){ return (timeToMin(a.c.start) - timeToMin(b.c.start)) || (a.i - b.i); });
+  return (x.day[key] = list.map(function(e){ return e.c; }));
+}
+function notesForDate(dateStr){ return idx().notes[dateStr] || []; }
 function weekGroupCount(kidId, dayIdxs, wd){
   var count = 0;
   dayIdxs.forEach(function(i){ count += classesForDay(kidId, i, wd[i]).length; });
@@ -631,7 +795,7 @@ function getClosedEntry(c, dateStr){
   return c.closedDates.find(function(e){ return e.date === dateStr; }) || null;
 }
 function getHoliday(dateStr){
-  return DATA.holidays.find(function(h){ return h.date === dateStr; }) || null;
+  return idx().hol[dateStr] || null;
 }
 function isOpenOverride(c, dateStr){
   return !!(c.openOverrides && c.openOverrides.indexOf(dateStr) !== -1);
@@ -653,35 +817,12 @@ function isClosedByHolidayOnly(c, dateStr){
 }
 var CLASS_ACCENTS = ["#059669","#4338CA","#B45309","#BE123C","#0891B2","#A21CAF","#166534","#334155"];
 function classAccentColor(title, kidId){
-  var allTitles = Array.from(new Set(DATA.classes.filter(function(c){ return c.kidId === kidId; }).map(function(c){ return c.title; }))).sort();
-  var idx = allTitles.indexOf(title);
-  if (idx === -1) idx = 0;
-  return CLASS_ACCENTS[idx % CLASS_ACCENTS.length];
+  var m = idx().accent[kidId];
+  return (m && m[title]) || CLASS_ACCENTS[0];
 }
 function dayHasPendingHomework(kidId, dateStr){
   var items = classesForDay(kidId, mondayIndex(dateStr), dateStr);
   return items.some(function(c){ return !isClosedOn(c, dateStr) && hwStatus(DATA.homework[c.id+"__"+dateStr], c.hwDefault) === "pending"; });
-}
-/* 오늘의 달성률: 오늘 체크할 수 있는 항목(학원류 출석 + 숙제 있는 항목) 중 완료한 비율.
-   학교는 원래 기본값이 "출석"이라 누르는 순간 결석으로 바뀌는 함정이 있어 달성률 계산에서 제외한다. */
-function todayProgress(kidId){
-  var today = todayStr();
-  var items = classesForDay(kidId, mondayIndex(today), today).filter(function(c){ return !isClosedOn(c, today); });
-  var total = 0, done = 0;
-  items.forEach(function(c){
-    if (c.type !== "학교") {
-      total++;
-      var att = DATA.attendance[c.id+"__"+today];
-      if (att && att.status === "출석") done++;
-    }
-    var hwSt = hwStatus(DATA.homework[c.id+"__"+today], c.hwDefault);
-    if (hwSt !== "none") {
-      total++;
-      if (hwSt === "done") done++;
-    }
-  });
-  var pct = total === 0 ? 0 : Math.round((done/total)*100);
-  return { total: total, done: done, pct: pct };
 }
 function getHomeworkList(kidId, daysBack, daysForward){
   var today = todayStr();
@@ -704,7 +845,9 @@ function getHomeworkList(kidId, daysBack, daysForward){
   return results;
 }
 function homeworkPendingCount(kidId){
-  return getHomeworkList(kidId, 14, 0).filter(function(h){ return h.status === "pending"; }).length;
+  var x = idx();
+  if (x.hwCount[kidId] === undefined) x.hwCount[kidId] = getHomeworkList(kidId, 14, 0).filter(function(h){ return h.status === "pending"; }).length;
+  return x.hwCount[kidId];
 }
 function addHomeworkItem(kidId, date, text){
   if (!ui.adminUnlocked) return;
@@ -713,13 +856,7 @@ function addHomeworkItem(kidId, date, text){
   scheduleSave(); render();
 }
 function toggleHomeworkItemStatus(id){
-  var willBeDone = null;
-  DATA.homeworkItems = DATA.homeworkItems.map(function(h){
-    if (h.id !== id) return h;
-    willBeDone = h.status !== "done";
-    return Object.assign({}, h, { status: willBeDone ? "done" : "pending" });
-  });
-  ui.stampPulse = willBeDone ? { key:"hw:manual__"+id, ts:Date.now() } : null;
+  DATA.homeworkItems = DATA.homeworkItems.map(function(h){ return h.id === id ? Object.assign({}, h, { status: h.status === "pending" ? "done" : "pending" }) : h; });
   scheduleSave(); render();
 }
 function toggleClassHwBinary(classId, date){
@@ -730,7 +867,6 @@ function toggleClassHwBinary(classId, date){
   var curStatus = hwStatus(cur, hwDefault);
   var next = curStatus === "done" ? "pending" : "done";
   DATA.homework[hwKey] = Object.assign({}, cur, { status: next, done: next === "done" });
-  ui.stampPulse = next === "done" ? { key: "hw:"+hwKey, ts: Date.now() } : null;
   scheduleSave(); render();
 }
 function deleteHomeworkItem(id){
@@ -832,7 +968,6 @@ function classSessionNumber(c, dateForRow){
     if (dayEntries.length > 0) return dayEntries.some(function(e){ return !isClosedOn(e, dateStr); });
     return !getHoliday(dateStr);
   }
-  var sessionsPerCycle = c.sessionsPerCycle ? Number(c.sessionsPerCycle) : null;
   var d = new Date(c.cycleStart+"T00:00:00");
   var count = 0, guard = 0;
   while (guard < 500){
@@ -840,9 +975,6 @@ function classSessionNumber(c, dateForRow){
     var wd = (d.getDay()+6)%7;
     if (isSessionDay(dateStr, wd)){
       count++;
-      // 등록한 총 횟수를 넘어서면(다음 등록 주기로 아직 안 넘어간 경우) 세션 번호를 매기지 않는다 —
-      // "3/12회차"처럼 분자가 분모를 넘는 이상한 표시를 막기 위함.
-      if (sessionsPerCycle && count > sessionsPerCycle) return null;
       if (dateStr === dateForRow) return count;
     }
     if (dateStr === dateForRow) return null;
@@ -1145,7 +1277,6 @@ function cycleAttendance(classId, dateStr){
     var prevReason = DATA.attendance[key] ? DATA.attendance[key].reason : "";
     DATA.attendance[key] = { status:next, time: nowHM(), reason: prevReason || "" };
   }
-  ui.stampPulse = (next === "출석") ? { key: "att:"+key, ts: Date.now() } : null;
   scheduleSave(); render();
 }
 function onReasonInput(classId, dateStr, text){
@@ -1172,7 +1303,6 @@ function cycleHomeworkStatus(classId, dateStr){
   var idx = HW_CYCLE.indexOf(hwStatus(cur, hwDefault));
   var next = HW_CYCLE[(idx+1) % HW_CYCLE.length];
   DATA.homework[key] = Object.assign({}, cur, { status: next, done: next === "done" });
-  ui.stampPulse = (next === "done") ? { key: "hw:"+key, ts: Date.now() } : null;
   scheduleSave(); render();
 }
 function onHomeworkInput(classId, dateStr, text){
@@ -1284,6 +1414,7 @@ function closeAdminPrompt(){ ui.showAdminPrompt = false; ui.pwInput = ""; ui.pwC
 function updateGroupField(idsStr, field, value){
   var ids = idsStr.split(",");
   DATA.classes = DATA.classes.map(function(c){ return ids.indexOf(c.id) !== -1 ? Object.assign({}, c, { [field]: value }) : c; });
+  invalidateIdx();
 }
 function blurGroupField(){ scheduleSave(); render(); }
 function updateCycleField(idsStr, field, value){
@@ -1319,60 +1450,21 @@ function toggleGroupPaid(idsStr){
   scheduleSave(); render();
 }
 
-/* ---------- 등록 주기 자동 관리 ----------
-   "이번 등록 시작일 + 총 수업 횟수"로 계산한 다음 시작일이 이미 지났으면,
-   cycleStart를 자동으로 그 다음 시작일로 넘겨서 세션 번호가 항상 현재 등록 주기를 기준으로 계산되게 한다.
-   (사용자가 등록현황에서 매번 직접 다음 시작일로 고쳐줄 필요가 없도록) */
-function advanceAcademyCycles(){
-  var today = todayStr();
-  var processed = {};
-  var changed = false;
-  DATA.classes.forEach(function(c){
-    if (c.type !== "학원" || !c.cycleStart || !c.sessionsPerCycle) return;
-    var groupKey = c.kidId+"__"+c.title;
-    if (processed[groupKey]) return;
-    processed[groupKey] = true;
-
-    var groupEntries = DATA.classes.filter(function(x){ return x.kidId === c.kidId && x.title === c.title && x.type === "학원"; });
-    var recurringEntries = groupEntries.filter(function(x){ return x.recurring; });
-    var autoWeekdays = Array.from(new Set(recurringEntries.map(function(x){ return x.day; }))).sort();
-    var effectiveWeekdays = (c.cycleWeekdays && c.cycleWeekdays.length) ? c.cycleWeekdays : autoWeekdays;
-    if (!effectiveWeekdays.length) return;
-
-    var curStart = c.cycleStart;
-    var guard = 0;
-    while (guard < 30){
-      var result = computeCycleDates(groupEntries, effectiveWeekdays, curStart, Number(c.sessionsPerCycle));
-      if (!result || result.nextCycleStart > today) break;
-      curStart = result.nextCycleStart;
-      guard++;
-    }
-    if (curStart !== c.cycleStart){
-      changed = true;
-      DATA.classes = DATA.classes.map(function(x){
-        if (x.kidId === c.kidId && x.title === c.title && x.type === "학원"){
-          return Object.assign({}, x, { cycleStart: curStart, dueDate: curStart });
-        }
-        return x;
-      });
-    }
-  });
-  return changed;
-}
-
 /* ---------- 렌더 ---------- */
 function render(){
+  invalidateIdx();
+  needsRender = false;
   if (ui.needsSetup) {
     document.getElementById("app").innerHTML = renderSetupScreen();
     return;
   }
-  if (advanceAcademyCycles()) scheduleSave();
-  ACTIVE_PULSE_KEY = ui.stampPulse ? ui.stampPulse.key : null;
-  ui.stampPulse = null;
   document.getElementById("app").innerHTML = renderHeader() + renderBody() + renderModal() + renderAdminPrompt() + renderNoteModal() + renderDuplicateModal();
   renderSyncBadge();
-  var tas = document.querySelectorAll(".hw-textarea");
-  for (var i=0;i<tas.length;i++){ autoGrow(tas[i]); }
+  // 높이 쓰기/읽기를 한 번에 몰아서 처리 (textarea마다 레이아웃 재계산 방지)
+  var tas = document.querySelectorAll(".hw-textarea"), hs = [], i;
+  for (i=0;i<tas.length;i++){ tas[i].style.height = "auto"; }
+  for (i=0;i<tas.length;i++){ hs[i] = tas[i].scrollHeight; }
+  for (i=0;i<tas.length;i++){ tas[i].style.height = hs[i] + "px"; }
 }
 function renderSetupScreen(){
   return '<div class="header"><div class="brand-row"><h1 class="brand-title">HAEYI SCHEDULER</h1></div></div>' +
@@ -1382,7 +1474,6 @@ function renderSetupScreen(){
     '<p>딱 한 번만 하면 돼요. Firebase 데이터베이스 주소를<br>아래에 붙여넣어 주세요.</p>' +
     '<input class="lock-input" style="text-align:left;letter-spacing:0;max-width:320px" placeholder="https://내프로젝트-default-rtdb.firebaseio.com/" value="'+esc(ui.setupUrlInput)+'" oninput="ui.setupUrlInput=this.value" onkeydown="if(event.key===\'Enter\')submitSetup()">' +
     '<button class="btn-primary" style="margin-top:10px;max-width:320px" onclick="submitSetup()">저장하고 시작</button>' +
-    '<button class="lock-forgot" onclick="skipSetup()">나중에 할게요 — 이 기기에만 저장하기</button>' +
     '</div></div>';
 }
 function renderSyncBadge(){
@@ -1417,8 +1508,8 @@ function resetSyncSetup(){
   if (!confirm("동기화 주소를 다시 설정할까요? 새로 설정하면 가족에게 새 링크를 다시 보내드려야 해요.")) return;
   fbUrl = null;
   lastSyncError = "";
-  try { localStorage.removeItem("family-fb-url"); } catch(e){}
-  try { localStorage.removeItem("family-schedule-local-only"); } catch(e){}
+  baseline = null; lastSeenTs = 0; initialDone = false;
+  try { localStorage.removeItem("family-fb-url"); localStorage.removeItem(BASE_KEY); } catch(e){}
   try { history.replaceState(null, "", location.pathname + location.search); } catch(e){ location.hash = ""; }
   ui.needsSetup = true;
   ui.setupUrlInput = "";
@@ -1546,7 +1637,7 @@ function renderMonthView(kid){
   var today = todayStr();
   var cells = g.cells.map(function(cell){
     var items = classesForDay(kid.id, mondayIndex(cell.date), cell.date);
-    var notes = DATA.calendarNotes.filter(function(n){ return n.date === cell.date; });
+    var notes = notesForDate(cell.date);
     var dayNum = parseInt(cell.date.slice(8,10),10);
     var pillHtml = items.map(function(c){
       var closed = isClosedOn(c, cell.date);
@@ -1636,7 +1727,7 @@ function renderClassRow(c, dateForRow){
     (c.location ? '<div class="row-loc">📍 '+esc(c.location)+'</div>' : '') +
     '</div>' +
     (status ? '<span class="row-status-label" style="color:'+ATT_STYLE[status].fill+'">'+(status==="결석"?"❌ ":"")+status+((att && att.time)?'<span class="row-time-mark"> · '+att.time+'</span>':'')+'</span>' : '') +
-    '<button class="stamp'+(ACTIVE_PULSE_KEY==="att:"+c.id+"__"+dateForRow?" stamp-pop":"")+'" style="'+stampStyle+'" onclick="cycleAttendance(\''+c.id+'\',\''+dateForRow+'\')">'+(status?ATT_STYLE[status].label:"체크")+'</button>' +
+    '<button class="stamp" style="'+stampStyle+'" onclick="cycleAttendance(\''+c.id+'\',\''+dateForRow+'\')">'+(status?ATT_STYLE[status].label:"체크")+'</button>' +
     (ui.adminUnlocked ? '<button class="mark-closed-btn" title="이 날 휴무로 표시 (공휴일/방학)" onclick="toggleClosedDate(\''+c.id+'\',\''+dateForRow+'\')">🚫</button>' : '') +
     '</div>' +
     (status === "결석"
@@ -1646,7 +1737,7 @@ function renderClassRow(c, dateForRow){
     '<div class="hw-row hw-'+hwSt+'"><span class="mini-label">숙제</span>' +
     '<span class="hw-accent-dot" style="background:'+accent+'"></span>' +
     '<textarea class="hw-input hw-textarea" rows="1" placeholder="수업이 끝난 후 나온 숙제를 적어주세요" oninput="onHomeworkInput(\''+c.id+'\',\''+dateForRow+'\',this.value);autoGrow(this)" onblur="blurHomework()">'+esc(hw.text)+'</textarea>' +
-    '<button class="hw-stamp'+(ACTIVE_PULSE_KEY==="hw:"+c.id+"__"+dateForRow?" stamp-pop":"")+'" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+dateForRow+'\')">'+hwStyle.label+'</button>' +
+    '<button class="hw-stamp" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+dateForRow+'\')">'+hwStyle.label+'</button>' +
     '</div>' +
     '<div class="prep-row"><span class="mini-label">준비물</span>' +
     '<button class="hw-check'+(sup.done?" done":"")+'" onclick="toggleSuppliesDone(\''+c.id+'\',\''+dateForRow+'\')">'+(sup.done?"✓":"")+'</button>' +
@@ -1728,29 +1819,10 @@ function renderGridView(kid){
   return '<div class="panel" style="'+kcss+'">'+toolbar+subTabs+legend+body+'</div>';
 }
 
-function progressRingSVG(pct, color){
-  var r = 30, c = 2*Math.PI*r;
-  var offset = c - (pct/100)*c;
-  return '<svg width="72" height="72" viewBox="0 0 72 72">' +
-    '<circle cx="36" cy="36" r="'+r+'" fill="none" stroke="#F0EAD9" stroke-width="7"/>' +
-    '<circle cx="36" cy="36" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="7" stroke-linecap="round" ' +
-    'stroke-dasharray="'+c+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 36 36)" style="transition:stroke-dashoffset .5s ease"/>' +
-    '</svg>';
-}
 function renderAttendanceView(kid){
   var wd = getWeekDates(ui.weekRef);
   var isCurrentWeek = wd.indexOf(todayStr()) !== -1;
   var kcss = '--kc-border:'+kid.color.border+';--kc-bg:'+kid.color.bg+';--kc-text:'+kid.color.text+';--kc-soft:'+kid.color.soft;
-
-  var prog = todayProgress(kid.id);
-  var progressCard = '<div class="progress-card" style="'+kcss+'">' +
-    '<div class="progress-ring-wrap">' + progressRingSVG(prog.pct, kid.color.border) +
-    '<div class="progress-ring-center">'+prog.pct+'%</div></div>' +
-    '<div class="progress-info">' +
-    '<div class="progress-title">오늘의 달성률</div>' +
-    '<div class="progress-count">오늘 <b>'+prog.done+'/'+prog.total+'</b>개 완료</div>' +
-    '<div class="progress-sub">'+(prog.total===0 ? "오늘은 체크할 항목이 없어요" : (prog.done===prog.total ? "오늘 할 일을 다 끝냈어요! 🎉" : (prog.total-prog.done)+"개 남았어요"))+'</div>' +
-    '</div></div>';
 
   var toolbar = '<div class="week-toolbar">' +
     '<div class="week-nav"><button onclick="weekPrev()">◀</button><button onclick="weekNext()">▶</button></div>' +
@@ -1810,7 +1882,7 @@ function renderAttendanceView(kid){
     '<div class="wk-subsection-label">월–금</div>' + buildWeekGrid([0,1,2,3,4], "평일 일정이 없어요.") +
     '<div class="wk-subsection-label">토–일</div>' + buildWeekGrid([5,6], "주말 일정이 없어요.");
 
-  return '<div class="panel" style="'+kcss+'">'+progressCard+toolbar+subTabs+legend+body+table+'</div>';
+  return '<div class="panel" style="'+kcss+'">'+toolbar+subTabs+legend+body+table+'</div>';
 }
 
 function onHwAddTextInput(v){ ui.hwAddText = v; }
@@ -1829,14 +1901,13 @@ function renderHomeworkView(kid){
     var isPending = h.status === "pending";
     var toggleAction = h.source === "class" ? "toggleClassHwBinary('"+h.classId+"','"+h.date+"')" : "toggleHomeworkItemStatus('"+h.id+"')";
     var delBtn = (ui.adminUnlocked && h.source === "manual") ? '<button class="closed-clear" onclick="deleteHomeworkItem(\''+h.id+'\')">삭제</button>' : "";
-    var pulseKey = h.source === "class" ? ("hw:"+h.classId+"__"+h.date) : ("hw:manual__"+h.id);
     return '<div class="hw-tab-item'+(isPending?" pending":" done")+'">' +
       '<div class="hw-tab-main">' +
       '<span class="hw-tab-dot" style="background:'+h.accent+'"></span>' +
       '<div class="hw-tab-body"><div class="hw-tab-date">'+formatKoreanDate(h.date)+' · '+esc(h.title)+'</div>' +
       (h.text ? '<div class="hw-tab-text">'+esc(h.text)+'</div>' : '<div class="hw-tab-text placeholder">내용이 입력되지 않았어요</div>') +
       '</div>' +
-      '<button class="hw-stamp'+(ACTIVE_PULSE_KEY===pulseKey?" stamp-pop":"")+'" style="background:'+(isPending?HW_STYLE.pending.bg:HW_STYLE.done.bg)+';border-color:'+(isPending?HW_STYLE.pending.border:HW_STYLE.done.border)+';color:'+(isPending?HW_STYLE.pending.text:HW_STYLE.done.text)+'" onclick="'+toggleAction+'">'+(isPending?"미완료":"완료")+'</button>' +
+      '<button class="hw-stamp" style="background:'+(isPending?HW_STYLE.pending.bg:HW_STYLE.done.bg)+';border-color:'+(isPending?HW_STYLE.pending.border:HW_STYLE.done.border)+';color:'+(isPending?HW_STYLE.pending.text:HW_STYLE.done.text)+'" onclick="'+toggleAction+'">'+(isPending?"미완료":"완료")+'</button>' +
       '</div>' +
       (delBtn ? '<div class="hw-tab-actions">'+delBtn+'</div>' : '') +
       '</div>';
