@@ -299,6 +299,36 @@ button, input { font-family: inherit; }
 .class-block.narrow { padding:3px 3px; }
 .class-block.narrow .cb-title { font-size:10px; }
 .kid-dot-inline { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:3px; flex-shrink:0; }
+/* 🏠 오늘 대시보드 */
+.dash-summary { padding:12px 14px 14px; display:flex; flex-direction:column; gap:6px; }
+.dash-notice { border-radius:12px; padding:9px 12px; font-size:12.5px; font-weight:600; line-height:1.45; }
+.dash-notice.warn { background:#FDEAEA; color:#8A1B18; }
+.dash-notice.hw { background:#FFF7E5; color:#7A4E00; cursor:pointer; }
+.dash-notice.ok { background:#EAFBF6; color:#0B5C50; }
+.dash-link { border:none; background:none; padding:0; margin-left:4px; font:inherit; font-weight:800; text-decoration:underline; color:inherit; cursor:pointer; }
+.dash-cards { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
+@media (min-width:640px){ .dash-cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; } }
+.dash-card { background:#fff; border-radius:18px; border:1px solid #F0EAD9; border-top:5px solid var(--kc-border); overflow:hidden; box-shadow:0 3px 12px rgba(154,130,80,0.06); }
+.dash-card-head { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--kc-soft); }
+.dash-kid-name { font-family:'Jua', sans-serif; font-size:18px; color:var(--kc-text); }
+.dash-more { margin-left:auto; border:none; background:transparent; color:var(--kc-text); font-size:12px; font-weight:700; cursor:pointer; padding:4px 0; }
+.dash-row { display:flex; align-items:center; gap:7px; padding:10px 12px; border-top:1px solid #F5EFDE; }
+.dash-row.status-출석 { background:#F3FCF9; }
+.dash-row.status-결석 { background:#FDF0F0; }
+.dash-row.status-조퇴 { background:#FFFAEF; }
+.dash-row.closed { opacity:0.55; }
+.dash-time { font-size:12.5px; font-weight:800; width:40px; flex-shrink:0; color:#4A4238; }
+.dash-body { flex:1; min-width:0; cursor:pointer; }
+.dash-title { font-size:14px; font-weight:700; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.dash-sub { font-size:11.5px; color:#8A7F6E; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dash-sub.warn { color:#C0392B; font-weight:700; }
+.dash-sub.done { text-decoration:line-through; color:#B5AA96; }
+.dash-tag { font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:999px; }
+.dash-tag.now { background:#FF6B4A; color:#fff; }
+.dash-tag.next { background:#EAF6FF; color:#0E4A78; }
+.dash-btn { flex-shrink:0; border:1.5px solid #E8DFCB; background:#fff; color:#8A7F6E; border-radius:999px; padding:7px 9px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap; }
+.dash-btn.att { min-width:46px; }
+.dash-empty { padding:16px 14px; font-size:12.5px; color:#B5AA96; text-align:center; }
 .hw-add-form .time-row { flex-wrap:wrap; }
 .hw-add-form .time-row input:not([type="date"]) { min-width:150px; }
 .hw-kid-select { border:1.5px solid #E8DFCB; border-radius:11px; padding:8px 10px; font-size:16px; font-family:inherit; background:#fff; color:#4A4238; flex:0 0 auto; }
@@ -328,7 +358,6 @@ var TYPE_COLOR = {
   "보강": { bg:"#FCE1EF", border:"#DB2777", text:"#9D174D" }
 };
 var ABSENT_COLOR = { bg:"#FFD2D2", border:"#DC2626", text:"#991B1B" };
-var ATT_CYCLE = [null, "출석", "결석", "조퇴"];
 var ATT_STYLE = {
   "출석": { fill:"#14B8A0", label:"출석" },
   "결석": { fill:"#E5383B", label:"결석" },
@@ -405,7 +434,8 @@ function normalizeAll(){ normalizeData(DATA); invalidateIdx(); }
 /* ---------- UI 상태 (기기별, 저장 안 됨) ---------- */
 var ui = {
   selectedKidId: null,
-  view: "attendance",
+  view: "today",
+  dashDate: todayStr(),
   selectedDay: mondayIndex(todayStr()),
   weekRef: todayStr(),
   calRef: todayStr(),
@@ -638,7 +668,7 @@ function pollOnce(){
     });
   }).catch(function(e){ lastSyncError = errText(e); syncStatus = "error"; renderSyncBadge(); });
 }
-var lastTickSig = "";
+var lastTickSig = "", lastTodayStr = todayStr();
 function tickSig(){
   return todayStr() + "|" + DATA.kids.map(function(k){ return kidNeedsArrivalAlert(k.id) ? 1 : 0; }).join("");
 }
@@ -654,7 +684,12 @@ function startPolling(){
   setInterval(function(){
     if (document.hidden || isUserTyping() || ui.modal || ui.noteModal || ui.dupModal || ui.showAdminPrompt || ui.needsSetup) return;
     var s = tickSig();
-    if (s !== lastTickSig) { lastTickSig = s; render(); }
+    if (s !== lastTickSig) {
+      lastTickSig = s;
+      var t = todayStr();
+      if (lastTodayStr !== t) { if (ui.dashDate === lastTodayStr) ui.dashDate = t; lastTodayStr = t; }  // 자정 지나면 '오늘' 화면도 다음 날로
+      render();
+    }
   }, 60000);
   document.addEventListener("visibilitychange", function(){
     if (document.hidden) doSave();
@@ -894,29 +929,22 @@ function statusIcon(status){
   if (status === "조퇴") return "◐ ";
   return "";
 }
-function kidNeedsArrivalAlert(kidId){
+// 오늘 시작 시간이 지났는데 출석 체크가 안 된 수업 (학교는 기본이 '출석'이라 제외)
+function lateClasses(kidId){
   var today = todayStr();
   var now = new Date();
   var nowMin = now.getHours()*60 + now.getMinutes();
-  var items = classesForDay(kidId, mondayIndex(today), today);
-  return items.some(function(c){
+  return classesForDay(kidId, mondayIndex(today), today).filter(function(c){
     if (isClosedOn(c, today)) return false;
     if (timeToMin(c.start) > nowMin) return false;
-    var att = DATA.attendance[c.id+"__"+today];
-    return !att;
+    return !attDisplayStatus(DATA.attendance[c.id+"__"+today], c.type, today);
   });
 }
+function kidNeedsArrivalAlert(kidId){ return lateClasses(kidId).length > 0; }
 function buildArrivalAlertMessage(kidId){
   var kid = DATA.kids.find(function(k){ return k.id === kidId; });
   if (!kid) return "";
-  var today = todayStr();
-  var items = classesForDay(kidId, mondayIndex(today), today);
-  var lateOnes = items.filter(function(c){
-    if (isClosedOn(c, today)) return false;
-    var now = new Date(); var nowMin = now.getHours()*60+now.getMinutes();
-    if (timeToMin(c.start) > nowMin) return false;
-    return !DATA.attendance[c.id+"__"+today];
-  });
+  var lateOnes = lateClasses(kidId);
   if (!lateOnes.length) return "";
   return "⏰ [출석 확인 필요]\n"+kid.name+"이(가) 아직 도착 확인이 안 됐어요: "+lateOnes.map(function(c){ return c.title+"("+c.start+")"; }).join(", ");
 }
@@ -973,12 +1001,19 @@ function kidTagHtml(kidId, cls, short){
 }
 function countAttendance(ids, start, end){
   if (!start || !end) return null;
-  var count = 0;
-  Object.keys(DATA.attendance).forEach(function(key){
-    var idx = key.indexOf("__");
-    var cid = key.slice(0, idx), date = key.slice(idx + 2);
-    if (ids.indexOf(cid) !== -1 && DATA.attendance[key].status === "출석" && date >= start && date <= end) count++;
-  });
+  // 기본이 출석이므로, 기간 안의 실제 수업일(휴무 제외, 오늘까지) 중 결석·조퇴가 아닌 날을 센다
+  var classes = DATA.classes.filter(function(c){ return ids.indexOf(c.id) !== -1; });
+  var last = end < todayStr() ? end : todayStr();
+  var count = 0, d = start, guard = 0;
+  while (d <= last && guard < 800){
+    var wd = mondayIndex(d);
+    classes.forEach(function(c){
+      var held = c.recurring ? (c.day === wd && isValidOnDate(c, d)) : c.date === d;
+      if (!held || isClosedOn(c, d)) return;
+      if (attDisplayStatus(DATA.attendance[c.id+"__"+d], c.type, d) === "출석") count++;
+    });
+    d = shiftDate(d, 1); guard++;
+  }
   return count;
 }
 function classCycleRange(c){
@@ -1087,6 +1122,7 @@ function academyGroups(kidId){
 function selectKid(id){
   ui.selectedKidId = id; ui.unlocked = false;
   try { localStorage.setItem(SEL_KID_KEY, id); } catch(e){}
+  if (ui.view === "today") ui.view = "attendance";   // 오늘 화면에서 아이를 누르면 그 아이 자세히 보기로
   render();
 }
 function goToView(v){
@@ -1307,15 +1343,14 @@ function toggleHolidayOverride(classId, dateStr){
   scheduleSave(); render();
 }
 
-var SCHOOL_ATT_CYCLE = [null, "결석", "조퇴"];
-function attDisplayStatus(att, classType){
+// 기본은 '출석' (오늘까지의 수업). 결석·조퇴일 때만 눌러서 바꾼다. 아직 안 온 날은 비워둠(미리 결석 표시 가능)
+var DEFAULT_ATT_CYCLE = [null, "결석", "조퇴"];
+function attDisplayStatus(att, classType, dateStr){
   if (att) return att.status;
-  return classType === "학교" ? "출석" : null;
+  return (!dateStr || dateStr <= todayStr()) ? "출석" : null;
 }
 function cycleAttendance(classId, dateStr){
-  var cls = DATA.classes.find(function(c){ return c.id === classId; });
-  var classType = cls ? cls.type : "학원";
-  var cycle = classType === "학교" ? SCHOOL_ATT_CYCLE : ATT_CYCLE;
+  var cycle = DEFAULT_ATT_CYCLE;
   var key = classId+"__"+dateStr;
   var cur = DATA.attendance[key] ? DATA.attendance[key].status : null;
   var idx = cycle.indexOf(cur);
@@ -1578,7 +1613,7 @@ function renderHeader(){
       (ui.adminUnlocked ? '<button class="brand-edit-btn" onclick="startEditTitle()">✎</button>' : '');
   }
   var kidTabs = DATA.kids.map(function(k){
-    var active = ui.selectedKidId === k.id;
+    var active = ui.view !== "today" && ui.selectedKidId === k.id;
     var needsArrival = kidNeedsArrivalAlert(k.id);
     var hwCount = homeworkPendingCount(k.id);
     return '<div class="kid-tab'+(active?" active":"")+'" style="--kc-border:'+k.color.border+';--kc-bg:'+k.color.bg+';--kc-text:'+k.color.text+'" onclick="selectKid(\''+k.id+'\')">' +
@@ -1591,7 +1626,7 @@ function renderHeader(){
       '</div>';
   }).join("");
   var allTab = DATA.kids.length >= 2
-    ? '<div class="kid-tab'+(isAllKids()?" active":"")+'" style="--kc-border:'+ALL_KID_COLOR.border+';--kc-bg:'+ALL_KID_COLOR.bg+';--kc-text:'+ALL_KID_COLOR.text+'" onclick="selectKid(\''+ALL_KIDS+'\')">' +
+    ? '<div class="kid-tab'+(isAllKids() && ui.view !== "today"?" active":"")+'" style="--kc-border:'+ALL_KID_COLOR.border+';--kc-bg:'+ALL_KID_COLOR.bg+';--kc-text:'+ALL_KID_COLOR.text+'" onclick="selectKid(\''+ALL_KIDS+'\')">' +
       DATA.kids.map(function(k){ return '<span class="dot" style="background:'+k.color.border+';margin-right:-3px"></span>'; }).join("") +
       '<span style="margin-left:4px">모두</span></div>'
     : '';
@@ -1639,7 +1674,7 @@ function renderBody(){
   if (!kid) return "";
   var hwCount = viewKidIds(kid).reduce(function(s, id){ return s + homeworkPendingCount(id); }, 0);
   var switchHtml = '<div class="view-switch">' +
-    tabBtn('detail','요일별') + tabBtn('attendance','출석체크') +
+    tabBtn('today','🏠 오늘') + tabBtn('detail','요일별') + tabBtn('attendance','출석체크') +
     '<button class="view-btn'+(ui.view==="homework"?" active":"")+(hwCount?" tab-alert":"")+'" onclick="goToView(\'homework\')">📝 숙제'+(hwCount?' <span class="tab-badge">'+hwCount+'</span>':'')+'</button>' +
     tabBtn('overview','전체보기') + tabBtn('payment','🔒 등록현황') +
     '</div>';
@@ -1652,12 +1687,99 @@ function renderBody(){
   else if (ui.view === "payment") content = (isAllKids() && ui.unlocked)
     ? DATA.kids.map(function(k){ return renderPaymentView(k); }).join('<div style="height:14px"></div>')
     : renderPaymentView(kid);
+  else if (ui.view === "today") content = renderDashboard();
   else content = renderAttendanceView(kid);
 
   return switchHtml + content;
 }
 function tabBtn(v, label){
   return '<button class="view-btn'+(ui.view===v?" active":"")+'" onclick="goToView(\''+v+'\')">'+label+'</button>';
+}
+
+/* ---------- 🏠 오늘 한눈에: 모든 아이의 하루를 카드로 나란히, 탭 이동 없이 체크 ---------- */
+function dashShift(n){ ui.dashDate = shiftDate(ui.dashDate, n); render(); }
+function dashToday(){ ui.dashDate = todayStr(); render(); }
+function openKidDay(kidId, dateStr){
+  ui.selectedKidId = kidId;
+  try { localStorage.setItem(SEL_KID_KEY, kidId); } catch(e){}
+  goToDate(dateStr);
+}
+function openHomeworkFor(kidId){
+  ui.selectedKidId = kidId;
+  try { localStorage.setItem(SEL_KID_KEY, kidId); } catch(e){}
+  goToView("homework");
+}
+function renderDashboard(){
+  var date = ui.dashDate || todayStr();
+  var today = todayStr(), isToday = date === today;
+  var dayIdx = mondayIndex(date);
+  var now = new Date(), nowMin = now.getHours()*60 + now.getMinutes();
+
+  var toolbar = '<div class="week-toolbar">' +
+    '<div class="week-nav"><button onclick="dashShift(-1)">◀</button><button onclick="dashShift(1)">▶</button></div>' +
+    '<span class="week-label">'+(isToday ? "오늘 · " : "")+formatKoreanDate(date)+'</span>' +
+    (isToday ? '' : '<button class="today-btn" onclick="dashToday()">오늘로</button>') +
+    '</div>';
+
+  // 확인할 것 요약
+  var notices = [];
+  DATA.kids.forEach(function(k){
+    if (isToday) {
+      var late = lateClasses(k.id);
+      if (late.length) notices.push('<div class="dash-notice warn">⏰ <b>'+esc(k.name)+'</b> 출석 확인 필요 — '+late.map(function(c){ return esc(c.title)+'('+c.start+')'; }).join(", ") +
+        ' <button class="dash-link" onclick="shareArrivalAlert(\''+k.id+'\')">카톡 알림</button></div>');
+    }
+    var hwn = homeworkPendingCount(k.id);
+    if (hwn) notices.push('<div class="dash-notice hw" onclick="openHomeworkFor(\''+k.id+'\')">📝 <b>'+esc(k.name)+'</b> 밀린 숙제 '+hwn+'개 <span class="dash-link">보기 ›</span></div>');
+  });
+  var summary = '<div class="dash-summary">' + (notices.length ? notices.join("") : '<div class="dash-notice ok">✅ 지금 확인할 것이 없어요</div>') + '</div>';
+
+  var cards = DATA.kids.map(function(k){
+    var kcss = '--kc-border:'+k.color.border+';--kc-bg:'+k.color.bg+';--kc-text:'+k.color.text+';--kc-soft:'+k.color.soft;
+    var items = classesForDay(k.id, dayIdx, date);
+    var nextMarked = false;
+    var rows = items.map(function(c){
+      if (isClosedOn(c, date)) {
+        return '<div class="dash-row closed"><span class="dash-time">'+c.start+'</span>' +
+          '<div class="dash-body"><div class="dash-title">'+esc(c.title)+'</div><div class="dash-sub">쉬는 날 · '+esc(getClosedReason(c, date))+'</div></div></div>';
+      }
+      var key = c.id+"__"+date;
+      var att = DATA.attendance[key] || null;
+      var status = attDisplayStatus(att, c.type, date);
+      var hw = DATA.homework[key] || { text:"" };
+      var hwSt = hwStatus(hw, c.hwDefault), hwStyle = HW_STYLE[hwSt];
+      var sup = DATA.supplies[key] || { text:"", done:false };
+      var startMin = timeToMin(c.start), endMin = timeToMin(c.end);
+      var tag = "";
+      if (isToday && startMin <= nowMin && nowMin < endMin) tag = '<span class="dash-tag now">수업 중</span>';
+      else if (isToday && startMin > nowMin && !nextMarked) { nextMarked = true; tag = '<span class="dash-tag next">다음</span>'; }
+      var dep = departureTime(c);
+      var subs = "";
+      if (isToday && !status && startMin <= nowMin) subs += '<div class="dash-sub warn">⏰ 출석 체크가 안 됐어요</div>';
+      if (dep && !status) subs += '<div class="dash-sub">🚶 '+dep+' 출발</div>';
+      if (att && att.reason) subs += '<div class="dash-sub">사유: '+esc(att.reason)+'</div>';
+      if (hw.text) subs += '<div class="dash-sub">📝 '+esc(hw.text)+'</div>';
+      if (sup.text) subs += '<div class="dash-sub'+(sup.done?" done":"")+'">🎒 '+esc(sup.text)+'</div>';
+      var attStyle = status ? 'background:'+ATT_STYLE[status].fill+';border-color:'+ATT_STYLE[status].fill+';color:#fff' : '';
+      return '<div class="dash-row'+(status?" status-"+status:"")+'">' +
+        '<span class="dash-time">'+c.start+'</span>' +
+        '<div class="dash-body" onclick="openKidDay(\''+k.id+'\',\''+date+'\')"><div class="dash-title">'+esc(c.title)+tag+'</div>'+subs+'</div>' +
+        '<button class="dash-btn" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+date+'\')">'+(hwSt==="none"?"숙제X":"숙제 "+hwStyle.label)+'</button>' +
+        '<button class="dash-btn att" style="'+attStyle+'" onclick="cycleAttendance(\''+c.id+'\',\''+date+'\')">'+(status||"체크")+'</button>' +
+        '</div>';
+    }).join("");
+    var hwn = homeworkPendingCount(k.id);
+    return '<div class="dash-card" style="'+kcss+'">' +
+      '<div class="dash-card-head"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:'+k.color.border+'"></span>' +
+      '<span class="dash-kid-name">'+esc(k.name)+'</span>' +
+      (hwn ? '<span class="tab-badge" title="밀린 숙제">'+hwn+'</span>' : '') +
+      '<button class="dash-more" onclick="openKidDay(\''+k.id+'\',\''+date+'\')">자세히 ›</button></div>' +
+      (rows || '<div class="dash-empty">이 날은 일정이 없어요</div>') +
+      '</div>';
+  }).join("");
+
+  return '<div class="panel">'+toolbar+summary+'</div><div class="dash-cards">'+cards+'</div>' +
+    '<div class="field-hint" style="text-align:center;margin-top:10px">수업 이름을 누르면 숙제 내용·준비물을 적을 수 있는 자세한 화면으로 가요.</div>';
 }
 
 function monthGrid(calRef){
@@ -1708,7 +1830,7 @@ function renderMonthView(kid){
         return '<div class="cal-pill '+(isHoliday?"cal-pill-holiday":"cal-pill-vacation")+'">'+(isHoliday?"🎌":"🏖️")+' <span class="cal-pill-text">'+esc(c.title)+'</span></div>';
       }
       var att = DATA.attendance[c.id+"__"+cell.date] || null;
-      var status = attDisplayStatus(att, c.type);
+      var status = attDisplayStatus(att, c.type, cell.date);
       var col = chipColors(c, status);
       var pk = isAllKids() ? kidById(c.kidId) : null;
       var accent = pk ? pk.color.border : classAccentColor(c.title, c.kidId);
@@ -1759,7 +1881,7 @@ function renderClassRow(c, dateForRow){
       '</div></div>';
   }
   var att = DATA.attendance[c.id+"__"+dateForRow] || null;
-  var status = attDisplayStatus(att, c.type);
+  var status = attDisplayStatus(att, c.type, dateForRow);
   var hwKey = c.id+"__"+dateForRow;
   var hw = DATA.homework[hwKey] || { text:"" };
   var hwSt = hwStatus(hw, c.hwDefault);
@@ -1881,7 +2003,7 @@ function renderGridView(kid){
           kidTag + '<div class="cb-title">'+(isHoliday?"🎌":"🏖️")+' '+esc(c.title)+'</div><div class="cb-time">'+reason+(ui.adminUnlocked?" · 눌러서 변경":"")+'</div></div>';
       }
       var att = DATA.attendance[c.id+"__"+dateForDay] || null;
-      var status = attDisplayStatus(att, c.type);
+      var status = attDisplayStatus(att, c.type, dateForDay);
       var border, bg, textc, isAbsent = status === "결석";
       if (isAbsent) { bg = ABSENT_COLOR.bg; border = ABSENT_COLOR.border; textc = ABSENT_COLOR.text; }
       else {
@@ -1959,7 +2081,7 @@ function renderAttendanceView(kid){
           var cls = classesForDay(row.kidId, i, wd[i]).find(function(c){ return c.title === title; });
           if (!cls) return '<div class="wk-grid-cell">–</div>';
           var att = DATA.attendance[cls.id+"__"+wd[i]];
-          var st = attDisplayStatus(att, cls.type);
+          var st = attDisplayStatus(att, cls.type, wd[i]);
           var dotStyle = st ? ('background:'+ATT_STYLE[st].fill+';border-color:'+ATT_STYLE[st].fill+';color:#fff') : "";
           return '<div class="wk-grid-cell"><span class="wk-dot" style="'+dotStyle+'">'+(st?st[0]:"")+'</span></div>';
         }).join("");
