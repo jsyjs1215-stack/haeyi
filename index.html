@@ -329,6 +329,11 @@ button, input { font-family: inherit; }
 .dash-btn { flex-shrink:0; border:1.5px solid #E8DFCB; background:#fff; color:#8A7F6E; border-radius:999px; padding:7px 9px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap; }
 .dash-btn.att { min-width:46px; }
 .dash-empty { padding:16px 14px; font-size:12.5px; color:#B5AA96; text-align:center; }
+.kid-section-head { display:flex; align-items:center; gap:7px; margin:14px 14px 8px; padding:8px 12px; border-radius:12px; background:var(--kc-soft); border-left:5px solid var(--kc-border); font-family:'Jua', sans-serif; font-size:16px; color:var(--kc-text); }
+.kid-section-dot { width:9px; height:9px; border-radius:50%; background:var(--kc-border); }
+.kid-section-head .ks-extra { margin-left:auto; font-family:'Noto Sans KR', sans-serif; font-size:11.5px; font-weight:700; }
+.day-list.in-section { padding-bottom:4px; }
+.kid-lane-bg { position:absolute; top:0; bottom:0; pointer-events:none; opacity:0.35; }
 .hw-add-form .time-row { flex-wrap:wrap; }
 .hw-add-form .time-row input:not([type="date"]) { min-width:150px; }
 .hw-kid-select { border:1.5px solid #E8DFCB; border-radius:11px; padding:8px 10px; font-size:16px; font-family:inherit; background:#fff; color:#4A4238; flex:0 0 auto; }
@@ -988,9 +993,14 @@ function selectedKid(){
 function viewKidIds(kid){ return kid.id === ALL_KIDS ? DATA.kids.map(function(k){ return k.id; }) : [kid.id]; }
 function classesForView(kid, dayIdx, dateForDay){
   if (kid.id !== ALL_KIDS) return classesForDay(kid.id, dayIdx, dateForDay);
+  // 아이 순서대로 묶어서 (섞지 않음)
   var list = [];
   DATA.kids.forEach(function(k){ list = list.concat(classesForDay(k.id, dayIdx, dateForDay)); });
-  return list.sort(function(a,b){ return timeToMin(a.start) - timeToMin(b.start); });
+  return list;
+}
+function kidSectionHead(k, extra){
+  return '<div class="kid-section-head" style="--kc-border:'+k.color.border+';--kc-text:'+k.color.text+';--kc-soft:'+k.color.soft+'">' +
+    '<span class="kid-section-dot"></span>'+esc(k.name)+(extra||"")+'</div>';
 }
 function kidTagHtml(kidId, cls, short){
   if (!isAllKids()) return "";
@@ -1858,7 +1868,8 @@ function clearClosedDate(classId, dateStr){
   });
   scheduleSave(); render();
 }
-function renderClassRow(c, dateForRow){
+function renderClassRow(c, dateForRow, hideKidTag){
+  var kidTag = hideKidTag ? "" : kidTagHtml(c.kidId);
   var closed = isClosedOn(c, dateForRow);
   if (closed) {
     var explicitEntry = getClosedEntry(c, dateForRow);
@@ -1876,7 +1887,7 @@ function renderClassRow(c, dateForRow){
     return '<div class="day-row-wrap closed-row '+(isHoliday?"closed-holiday":"closed-vacation")+'">' +
       '<div class="day-row-main">' +
       '<span class="row-time">'+c.start+'–'+c.end+'</span>' +
-      '<div class="row-body"><div class="row-title">'+kidTagHtml(c.kidId)+(isHoliday?"🎌":"🏖️")+' '+esc(c.title)+'<span class="recur-tag '+(isHoliday?"holiday-tag":"vacation-tag")+'">'+esc(reason)+'</span></div></div>' +
+      '<div class="row-body"><div class="row-title">'+kidTag+(isHoliday?"🎌":"🏖️")+' '+esc(c.title)+'<span class="recur-tag '+(isHoliday?"holiday-tag":"vacation-tag")+'">'+esc(reason)+'</span></div></div>' +
       actionHtml +
       '</div></div>';
   }
@@ -1905,7 +1916,7 @@ function renderClassRow(c, dateForRow){
     '<div class="day-row-main">' +
     timeHtml +
     '<div class="row-body" onclick="openEditModal(\''+c.id+'\',\''+dateForRow+'\')">' +
-    '<div class="row-title">'+kidTagHtml(c.kidId)+esc(c.title)+dateTag +
+    '<div class="row-title">'+kidTag+esc(c.title)+dateTag +
     (getHoliday(dateForRow) && isOpenOverride(c, dateForRow) ? '<span class="recur-tag holiday-tag">🎌 공휴일에도 운영</span>' : '') +
     '</div>' +
     (c.location ? '<div class="row-loc">📍 '+esc(c.location)+'</div>' : '') +
@@ -1942,11 +1953,14 @@ function layoutLanes(items){
     clusterEnd = Math.max(clusterEnd, e);
     res[c.id] = { lane:lane, cluster:cluster };
   });
-  return function(id){
-    var r = res[id], n = r.cluster.lanes.length;
-    if (n <= 1) return { style:"", narrow:false };
-    return { style:"left:calc("+(r.lane*100/n)+"% + 1px);width:calc("+(100/n)+"% - 2px);right:auto;", narrow:true };
-  };
+  return function(id){ var r = res[id]; return { lane:r.lane, n:r.cluster.lanes.length }; };
+}
+// 칸 안에서의 가로 위치. "모두" 보기에선 아이마다 고정된 세로 칸(왼쪽부터 아이 순서)을 쓰고, 그 안에서 겹치면 다시 나눈다
+function laneStyle(kidSlot, kidCount, lane, n){
+  var total = kidCount * n;
+  if (total <= 1) return { style:"", narrow:false };
+  var left = (kidSlot + lane / n) * 100 / kidCount, width = 100 / total;
+  return { style:"left:calc("+left+"% + 1px);width:calc("+width+"% - 2px);right:auto;", narrow:true };
 }
 function renderGridView(kid){
   var wd = getWeekDates(ui.weekRef);
@@ -1969,7 +1983,8 @@ function renderGridView(kid){
     '<span class="legend-item"><span class="legend-dot" style="background:#fff;border:3px solid #0E9C7A"></span> 출석(굵은 초록 테두리)</span>' +
     '<span class="legend-item"><span class="legend-dot" style="background:#E5383B"></span> 결석</span>' +
     '<span class="legend-item"><span class="legend-dot" style="background:#fff;border:3px solid #D98C00"></span> 조퇴(굵은 주황 테두리)</span>' +
-    '<span class="legend-item">- - - 이 날짜만 등록된 일정</span></div>';
+    '<span class="legend-item">- - - 이 날짜만 등록된 일정</span></div>' +
+    (isAllKids() ? '<div class="legend" style="font-weight:700">칸 순서(왼쪽부터): ' + DATA.kids.map(function(k){ return '<span class="legend-item"><span class="legend-dot" style="background:'+k.color.border+'"></span>'+esc(k.name)+'</span>'; }).join(" ") + '</div>' : '');
 
   var activeDays = ui.gridDayGroup === "weekend" ? [5,6] : [0,1,2,3,4];
   var colTemplate = '38px repeat('+activeDays.length+', minmax(0,1fr))';
@@ -1986,9 +2001,16 @@ function renderGridView(kid){
   var dayCols = activeDays.map(function(dayIdx){
     var dateForDay = wd[dayIdx];
     var items = classesForView(kid, dayIdx, dateForDay);
-    var laneOf = layoutLanes(items);
-    var blocks = items.map(function(c){
-      var ln = laneOf(c.id);
+    var allMode = isAllKids(), kidCount = allMode ? DATA.kids.length : 1;
+    var lanes = {};
+    viewKidIds(kid).forEach(function(kidId){ lanes[kidId] = layoutLanes(classesForDay(kidId, dayIdx, dateForDay)); });
+    var laneBg = allMode ? DATA.kids.map(function(k, i){
+      return '<div class="kid-lane-bg" style="left:'+(i*100/kidCount)+'%;width:'+(100/kidCount)+'%;background:'+(i%2 ? k.color.soft : "transparent")+'"></div>';
+    }).join("") : "";
+    var blocks = laneBg + items.map(function(c){
+      var slot = allMode ? DATA.kids.findIndex(function(k){ return k.id === c.kidId; }) : 0;
+      var l = lanes[c.kidId](c.id);
+      var ln = laneStyle(slot, kidCount, l.lane, l.n);
       var kidTag = kidTagHtml(c.kidId, "cb-kid", ln.narrow);
       var top = ((timeToMin(c.start) - HOUR_START*60)/60)*ROW_H;
       var hgt = Math.max(((timeToMin(c.end)-timeToMin(c.start))/60)*ROW_H, 30);
@@ -2051,17 +2073,27 @@ function renderAttendanceView(kid){
     var isToday = wd[i] === todayStr();
     return '<div class="day-tab'+(ui.selectedDay===i?" active":"")+(isToday?" is-today":"")+'" onclick="selectDay('+i+')">'+DAYS[i]+(isToday?'<span class="today-mark">오늘</span>':'')+'<span class="tab-date">'+formatMD(wd[i])+'</span></div>';
   }).join("");
-  var list = detailClasses.length === 0
-    ? '<div class="day-empty">이 날은 등록된 일정이 없어요.</div>'
-    : '<div class="day-list">'+detailClasses.map(function(c){ return renderClassRow(c, detailDate); }).join("")+'</div>';
+  var list;
+  if (isAllKids()) {
+    // 아이별 구역으로 나눠서
+    list = DATA.kids.map(function(k){
+      var mine = classesForDay(k.id, ui.selectedDay, detailDate);
+      return kidSectionHead(k) + (mine.length
+        ? '<div class="day-list in-section">'+mine.map(function(c){ return renderClassRow(c, detailDate, true); }).join("")+'</div>'
+        : '<div class="day-empty" style="padding:8px 14px 12px">일정이 없어요.</div>');
+    }).join("");
+  } else {
+    list = detailClasses.length === 0
+      ? '<div class="day-empty">이 날은 등록된 일정이 없어요.</div>'
+      : '<div class="day-list">'+detailClasses.map(function(c){ return renderClassRow(c, detailDate); }).join("")+'</div>';
+  }
   var body = '<div class="day-tabs" style="'+(activeDays.length<=2?'grid-template-columns:repeat('+activeDays.length+',96px);justify-content:center':'grid-template-columns:repeat('+activeDays.length+',minmax(0,1fr))')+'">'+dayTabs+'</div>' +
     '<div class="sched-header"><span class="daylabel">'+formatKoreanDate(detailDate)+'</span>' +
     (ui.adminUnlocked ? '<button class="add-class-btn" onclick="openNewModal('+ui.selectedDay+',\''+detailDate+'\')">+ 일정 추가</button>' : '') + '</div>' + list;
 
-  function buildWeekGrid(dayIdxs, emptyMsg){
-    // 행 = (아이, 수업이름) 조합. "모두" 보기에선 아이 순서대로 묶어서 보여줌
+  function buildWeekGrid(dayIdxs, emptyMsg, kidIds){
     var rowKeys = [], seen = {};
-    viewKidIds(kid).forEach(function(kidId){
+    kidIds.forEach(function(kidId){
       dayIdxs.forEach(function(i){
         classesForDay(kidId, i, wd[i]).forEach(function(c){
           var key = kidId+"|"+c.title;
@@ -2074,9 +2106,8 @@ function renderAttendanceView(kid){
       rows = '<div class="wk-grid-empty">'+emptyMsg+'</div>';
     } else {
       rows = rowKeys.map(function(row){
-        var title = row.title, rk = isAllKids() ? kidById(row.kidId) : null;
-        var labelCell = '<div class="wk-grid-cell wk-grid-label" title="'+esc((rk?rk.name+" · ":"")+title)+'">' +
-          (rk ? '<span class="kid-dot-inline" style="background:'+rk.color.border+'"></span>' : '') + esc(title)+'</div>';
+        var title = row.title;
+        var labelCell = '<div class="wk-grid-cell wk-grid-label" title="'+esc(title)+'">'+esc(title)+'</div>';
         var dayCells = dayIdxs.map(function(i){
           var cls = classesForDay(row.kidId, i, wd[i]).find(function(c){ return c.title === title; });
           if (!cls) return '<div class="wk-grid-cell">–</div>';
@@ -2090,11 +2121,14 @@ function renderAttendanceView(kid){
     }
     var headerRow = '<div class="wk-grid-cell wk-grid-label"></div>' +
       dayIdxs.map(function(i){ return '<div class="wk-grid-cell wk-grid-head">'+DAYS[i]+'<br><span>'+formatMD(wd[i])+'</span></div>'; }).join("");
-    return '<div class="wk-grid" style="grid-template-columns:'+(isAllKids()?72:56)+'px repeat('+dayIdxs.length+', minmax(0,1fr))">'+headerRow+rows+'</div>';
+    return '<div class="wk-grid" style="grid-template-columns:56px repeat('+dayIdxs.length+', minmax(0,1fr))">'+headerRow+rows+'</div>';
   }
-  var table = '<div class="section-label">이번 주 출석 현황</div>' +
-    '<div class="wk-subsection-label">월–금</div>' + buildWeekGrid([0,1,2,3,4], "평일 일정이 없어요.") +
-    '<div class="wk-subsection-label">토–일</div>' + buildWeekGrid([5,6], "주말 일정이 없어요.");
+  var table = '<div class="section-label">이번 주 출석 현황</div>';
+  (isAllKids() ? DATA.kids : [kid]).forEach(function(k){
+    if (isAllKids()) table += kidSectionHead(k);
+    table += '<div class="wk-subsection-label">월–금</div>' + buildWeekGrid([0,1,2,3,4], "평일 일정이 없어요.", [k.id]) +
+      '<div class="wk-subsection-label">토–일</div>' + buildWeekGrid([5,6], "주말 일정이 없어요.", [k.id]);
+  });
 
   return '<div class="panel" style="'+kcss+'">'+toolbar+subTabs+legend+body+table+'</div>';
 }
@@ -2123,7 +2157,7 @@ function renderHomeworkView(kid){
     return '<div class="hw-tab-item'+(isPending?" pending":" done")+'">' +
       '<div class="hw-tab-main">' +
       '<span class="hw-tab-dot" style="background:'+h.accent+'"></span>' +
-      '<div class="hw-tab-body"><div class="hw-tab-date">'+kidTagHtml(h.kidId)+(isAllKids()?' ':'')+formatKoreanDate(h.date)+' · '+esc(h.title)+'</div>' +
+      '<div class="hw-tab-body"><div class="hw-tab-date">'+formatKoreanDate(h.date)+' · '+esc(h.title)+'</div>' +
       (h.text ? '<div class="hw-tab-text">'+esc(h.text)+'</div>' : '<div class="hw-tab-text placeholder">내용이 입력되지 않았어요</div>') +
       '</div>' +
       '<button class="hw-stamp" style="background:'+(isPending?HW_STYLE.pending.bg:HW_STYLE.done.bg)+';border-color:'+(isPending?HW_STYLE.pending.border:HW_STYLE.done.border)+';color:'+(isPending?HW_STYLE.pending.text:HW_STYLE.done.text)+'" onclick="'+toggleAction+'">'+(isPending?"미완료":"완료")+'</button>' +
@@ -2147,16 +2181,27 @@ function renderHomeworkView(kid){
     '</div>'
   ) : "";
 
-  var pendingSection = pending.length
-    ? '<div class="section-label" style="color:#B0342F">🔴 미완료 ('+pending.length+'개)</div><div class="hw-tab-list">'+pending.map(renderItem).join("")+'</div>'
-    : '<div class="hw-tab-empty">🎉 미완료 숙제가 없어요!</div>';
-  var doneSection = done.length
-    ? '<div class="section-label" style="margin-top:14px">완료됨</div><div class="hw-tab-list">'+done.map(renderItem).join("")+'</div>'
-    : '';
+  function sections(p, d){
+    return (p.length
+        ? '<div class="section-label" style="color:#B0342F">🔴 미완료 ('+p.length+'개)</div><div class="hw-tab-list">'+p.map(renderItem).join("")+'</div>'
+        : '<div class="hw-tab-empty">🎉 미완료 숙제가 없어요!</div>') +
+      (d.length ? '<div class="section-label" style="margin-top:14px">완료됨</div><div class="hw-tab-list">'+d.map(renderItem).join("")+'</div>' : '');
+  }
+  var listHtml;
+  if (isAllKids()) {
+    // 아이별 구역으로 나눠서
+    listHtml = DATA.kids.map(function(k){
+      var p = pending.filter(function(h){ return h.kidId === k.id; });
+      var d = done.filter(function(h){ return h.kidId === k.id; });
+      return kidSectionHead(k, p.length ? '<span class="ks-extra" style="color:#B0342F">미완료 '+p.length+'개</span>' : '<span class="ks-extra">✓ 다 했어요</span>') + sections(p, d);
+    }).join("");
+  } else {
+    listHtml = sections(pending, done);
+  }
 
   return '<div class="panel" style="'+kcss+'">' +
     '<div class="week-toolbar"><span class="week-label">'+esc(kid.name)+'의 숙제</span></div>' +
-    addForm + pendingSection + doneSection +
+    addForm + listHtml +
     '</div>';
 }
 function renderPaymentView(kid){
