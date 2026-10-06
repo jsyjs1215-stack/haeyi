@@ -53,7 +53,7 @@ button, input { font-family: inherit; }
 .empty-state { background:#fff; border:2px dashed #DCD3C0; border-radius:22px; padding:40px 20px; text-align:center; color:#9C9282; margin-top:18px; }
 .empty-state h3 { font-family:'Jua', sans-serif; font-weight:400; font-size:18px; color:#4A4238; margin:0 0 6px; }
 
-.view-switch { display:flex; gap:3px; background:#F0EAD9; padding:4px; border-radius:999px; width:fit-content; margin:16px 0 14px; overflow-x:auto; max-width:100%; }
+.view-switch { display:flex; flex-wrap:wrap; gap:3px; background:#F0EAD9; padding:4px; border-radius:20px; width:fit-content; margin:16px 0 14px; max-width:100%; }
 .mode-toggle { display:flex; gap:3px; background:#F0EAD9; padding:3px; border-radius:999px; width:fit-content; margin:0 14px 10px; }
 .mode-toggle button { border:none; background:transparent; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:600; color:#8A7F6E; cursor:pointer; }
 .mode-toggle button.active { background:#fff; color:#4A4238; box-shadow:0 1px 2px rgba(0,0,0,0.06); }
@@ -334,6 +334,30 @@ button, input { font-family: inherit; }
 .kid-section-head .ks-extra { margin-left:auto; font-family:'Noto Sans KR', sans-serif; font-size:11.5px; font-weight:700; }
 .day-list.in-section { padding-bottom:4px; }
 .kid-lane-bg { position:absolute; top:0; bottom:0; pointer-events:none; opacity:0.35; }
+/* 🎒 준비물 탭 */
+.dash-notice.req { background:#EAF6FF; color:#0E4A78; cursor:pointer; }
+.req-form { margin:14px 14px 4px; background:#F4F9FE; border:1.5px solid #CFE6FA; border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.req-form-title { font-family:'Jua', sans-serif; font-size:16px; color:#0E4A78; }
+.req-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.req-chip { border:1.5px solid #D8CBAE; background:#fff; color:#6B6153; border-radius:999px; padding:7px 13px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.req-chip.small { padding:5px 10px; font-size:12px; }
+.req-chip.on { background:#2E93E0; border-color:#2E93E0; color:#fff; }
+.req-input { width:100%; border:1.5px solid #CFE6FA; border-radius:12px; padding:10px 12px; font-size:16px; outline:none; font-family:inherit; background:#fff; }
+.req-input:focus { border-color:#2E93E0; }
+.req-date { border:1.5px solid #D8CBAE; border-radius:999px; padding:4px 8px; font-size:13px; font-family:inherit; background:#fff; color:#6B6153; }
+.req-list { display:flex; flex-direction:column; gap:7px; padding:4px 14px 6px; }
+.req-item { display:flex; align-items:center; gap:9px; background:#FBF9F4; border-left:4px solid #2E93E0; border-radius:13px; padding:10px 10px 10px 12px; }
+.req-item.buy { border-left-color:#F5427D; background:#FFF6F9; }
+.req-item.overdue { border-left-color:#E5383B; background:#FDEAEA; }
+.req-item.done { border-left-color:#D8CBAE; opacity:0.6; }
+.req-item.done .req-text { text-decoration:line-through; }
+.req-icon { font-size:18px; flex-shrink:0; }
+.req-body { flex:1; min-width:0; }
+.req-text { font-size:14px; font-weight:700; color:#4A4238; word-break:break-word; }
+.req-meta { font-size:11px; color:#9C9282; margin-top:2px; }
+.req-done-btn { flex-shrink:0; border:none; background:#14B8A0; color:#fff; border-radius:999px; padding:8px 11px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; font-family:inherit; }
+.req-done-btn.undo { background:#E8DFCB; color:#6B6153; }
+.req-del { flex-shrink:0; border:none; background:none; color:#B5AA96; font-size:13px; cursor:pointer; padding:4px; }
 .hw-add-form .time-row { flex-wrap:wrap; }
 .hw-add-form .time-row input:not([type="date"]) { min-width:150px; }
 .hw-kid-select { border:1.5px solid #E8DFCB; border-radius:11px; padding:8px 10px; font-size:16px; font-family:inherit; background:#fff; color:#4A4238; flex:0 0 auto; }
@@ -431,6 +455,8 @@ function normalizeData(d){
   d.calendarNotes = d.calendarNotes || [];
   d.holidays = d.holidays || [];
   d.homeworkItems = d.homeworkItems || [];
+  // 준비물·구매 요청: id를 키로 하는 객체 (기기 여러 대에서 동시에 추가해도 항목 단위로 합쳐지게)
+  d.requests = (d.requests && typeof d.requests === "object" && !Array.isArray(d.requests)) ? d.requests : {};
   if (!d.appTitle) d.appTitle = "HAEYI SCHEDULER";
   return d;
 }
@@ -507,7 +533,7 @@ function remotePatch(text){
 
 /* 서버와 마지막으로 맞춘 상태(baseline)를 키별 JSON 문자열로 기억해 두고, 지금 DATA와 비교해 바뀐 부분만 PATCH 한다.
    attendance/homework/supplies는 항목 단위, 나머지는 최상위 키 단위로 비교. */
-var MAP_KEYS = { attendance:1, homework:1, supplies:1 };
+var MAP_KEYS = { attendance:1, homework:1, supplies:1, requests:1 };
 var SAFE_KEY = /^[^.$#\[\]\/]+$/;
 var BASE_KEY = "family-schedule-sync-base";
 var baseline = null, lastSeenTs = 0;
@@ -1686,6 +1712,10 @@ function renderBody(){
   var switchHtml = '<div class="view-switch">' +
     tabBtn('today','🏠 오늘') + tabBtn('detail','요일별') + tabBtn('attendance','출석체크') +
     '<button class="view-btn'+(ui.view==="homework"?" active":"")+(hwCount?" tab-alert":"")+'" onclick="goToView(\'homework\')">📝 숙제'+(hwCount?' <span class="tab-badge">'+hwCount+'</span>':'')+'</button>' +
+    (function(){
+      var rc = viewKidIds(kid).reduce(function(s, id){ return s + openRequestCount(id); }, 0);
+      return '<button class="view-btn'+(ui.view==="supplies"?" active":"")+'" onclick="goToView(\'supplies\')">🎒 준비물'+(rc?' <span class="tab-badge" style="background:#2E93E0">'+rc+'</span>':'')+'</button>';
+    })() +
     tabBtn('overview','전체보기') + tabBtn('payment','🔒 등록현황') +
     '</div>';
 
@@ -1694,6 +1724,7 @@ function renderBody(){
   else if (ui.view === "overview") content = renderMonthView(kid);
   else if (ui.view === "attendance") content = renderAttendanceView(kid);
   else if (ui.view === "homework") content = renderHomeworkView(kid);
+  else if (ui.view === "supplies") content = renderSuppliesView(kid);
   else if (ui.view === "payment") content = (isAllKids() && ui.unlocked)
     ? DATA.kids.map(function(k){ return renderPaymentView(k); }).join('<div style="height:14px"></div>')
     : renderPaymentView(kid);
@@ -1741,6 +1772,9 @@ function renderDashboard(){
     }
     var hwn = homeworkPendingCount(k.id);
     if (hwn) notices.push('<div class="dash-notice hw" onclick="openHomeworkFor(\''+k.id+'\')">📝 <b>'+esc(k.name)+'</b> 밀린 숙제 '+hwn+'개 <span class="dash-link">보기 ›</span></div>');
+    var reqs = openRequestItems(k.id);
+    if (reqs.length) notices.push('<div class="dash-notice req" onclick="openSuppliesFor(\''+k.id+'\')">🎒 <b>'+esc(k.name)+'</b> 준비물·요청 '+reqs.length+'개 — ' +
+      reqs.slice(0,3).map(function(r){ return (r.kind==="buy"?"🛒":"")+esc(r.text); }).join(", ")+(reqs.length>3?" 외":"")+' <span class="dash-link">보기 ›</span></div>');
   });
   var summary = '<div class="dash-summary">' + (notices.length ? notices.join("") : '<div class="dash-notice ok">✅ 지금 확인할 것이 없어요</div>') + '</div>';
 
@@ -2204,6 +2238,137 @@ function renderHomeworkView(kid){
     addForm + listHtml +
     '</div>';
 }
+/* ---------- 🎒 준비물 탭: 아이들이 준비물·사줄 물건을 요청하고, 부모님이 챙기면 체크 ---------- */
+var CLASS_SUPPLY_DAYS = 7;   // 수업 줄에 적힌 준비물은 앞뒤 7일 것만 모아서 보여줌
+function requestItems(kidId){
+  return Object.keys(DATA.requests).map(function(id){ return Object.assign({ id:id, source:"request" }, DATA.requests[id]); })
+    .filter(function(r){ return r.kidId === kidId; });
+}
+// 수업 줄의 '준비물' 칸에 적힌 것들도 함께 모음
+function classSupplyItems(kidId){
+  var from = shiftDate(todayStr(), -CLASS_SUPPLY_DAYS), to = shiftDate(todayStr(), CLASS_SUPPLY_DAYS);
+  var out = [];
+  Object.keys(DATA.supplies).forEach(function(key){
+    var s = DATA.supplies[key];
+    if (!s || !s.text || !String(s.text).trim()) return;
+    var i = key.indexOf("__"), cid = key.slice(0, i), date = key.slice(i + 2);
+    if (date < from || date > to) return;
+    var c = DATA.classes.find(function(x){ return x.id === cid; });
+    if (!c || c.kidId !== kidId) return;
+    out.push({ source:"class", classId:cid, date:date, kidId:kidId, kind:"prep", text:s.text, status: s.done ? "done" : "open", classTitle:c.title });
+  });
+  return out;
+}
+function openRequestItems(kidId){
+  return requestItems(kidId).concat(classSupplyItems(kidId)).filter(function(r){ return r.status !== "done"; })
+    .sort(function(a,b){ return (a.due||"9999") < (b.due||"9999") ? -1 : (a.due||"9999") > (b.due||"9999") ? 1 : (a.createdAt||0) - (b.createdAt||0); });
+}
+function openRequestCount(kidId){ return openRequestItems(kidId).length; }
+function openSuppliesFor(kidId){
+  ui.selectedKidId = kidId;
+  try { localStorage.setItem(SEL_KID_KEY, kidId); } catch(e){}
+  goToView("supplies");
+}
+function reqSet(field, value, rerender){ ui[field] = value; if (rerender) render(); }
+function addRequest(){
+  var text = (ui.reqText || "").trim();
+  if (!text) { showToast("무엇이 필요한지 적어주세요!"); return; }
+  var kidId = isAllKids() ? ((ui.reqKidId && kidById(ui.reqKidId)) ? ui.reqKidId : DATA.kids[0].id) : ui.selectedKidId;
+  DATA.requests[uid()] = { kidId:kidId, text:text, kind: ui.reqKind || "prep", due: ui.reqDue || "", status:"open", createdAt: Date.now(), doneDate:"" };
+  ui.reqText = ""; ui.reqDue = "";
+  scheduleSave(); render();
+  showToast("요청했어요! 엄마·아빠 화면에도 바로 보여요.");
+}
+function toggleRequest(id){
+  var r = DATA.requests[id];
+  if (!r) return;
+  var done = r.status !== "done";
+  DATA.requests[id] = Object.assign({}, r, { status: done ? "done" : "open", doneDate: done ? todayStr() : "" });
+  scheduleSave(); render();
+}
+function deleteRequest(id){
+  var r = DATA.requests[id];
+  if (!r || !confirm('"'+r.text+'" 요청을 지울까요?')) return;
+  delete DATA.requests[id];
+  scheduleSave(); render();
+}
+function shareRequests(kidIdsStr){
+  var lines = kidIdsStr.split(",").map(function(kidId){
+    var k = kidById(kidId), items = openRequestItems(kidId);
+    if (!k || !items.length) return "";
+    return k.name+": "+items.map(function(r){ return (r.kind==="buy"?"🛒":"🎒")+r.text+(r.due?"("+formatMD(r.due)+"까지)":""); }).join(", ");
+  }).filter(Boolean);
+  if (!lines.length) { showToast("요청한 준비물이 없어요."); return; }
+  shareText("🎒 [준비물·사주세요 요청]\n"+lines.join("\n"));
+}
+function reqDueLabel(r){
+  if (!r.due) return "언제든";
+  var t = todayStr();
+  if (r.status !== "done" && r.due < t) return '<b style="color:#C0392B">⚠️ '+formatMD(r.due)+'까지였어요</b>';
+  if (r.due === t) return '<b style="color:#C0392B">오늘까지</b>';
+  if (r.due === shiftDate(t, 1)) return '<b style="color:#D98C00">내일까지</b>';
+  return formatMD(r.due)+'까지';
+}
+function renderRequestRow(r){
+  var done = r.status === "done";
+  var icon = r.source === "class" ? "📚" : (r.kind === "buy" ? "🛒" : "🎒");
+  var meta = r.source === "class"
+    ? esc(r.classTitle)+' 수업('+formatMD(r.date)+')에서 적음'
+    : reqDueLabel(r) + (r.createdAt ? ' · '+formatMD(dateToStr(new Date(r.createdAt)))+' 요청' : '') + (done && r.doneDate ? ' · '+formatMD(r.doneDate)+' 완료' : '');
+  var toggle = r.source === "class" ? "toggleSuppliesDone('"+r.classId+"','"+r.date+"')" : "toggleRequest('"+r.id+"')";
+  var label = done ? "되돌리기" : (r.kind === "buy" ? "샀어요 ✓" : "챙겼어요 ✓");
+  var overdue = !done && r.due && r.due < todayStr();
+  return '<div class="req-item'+(done?" done":"")+(overdue?" overdue":"")+(r.kind==="buy"&&!done?" buy":"")+'">' +
+    '<span class="req-icon">'+icon+'</span>' +
+    '<div class="req-body"><div class="req-text">'+esc(r.text)+'</div><div class="req-meta">'+meta+'</div></div>' +
+    '<button class="req-done-btn'+(done?" undo":"")+'" onclick="'+toggle+'">'+label+'</button>' +
+    (r.source === "request" ? '<button class="req-del" title="지우기" onclick="deleteRequest(\''+r.id+'\')">✕</button>' : '') +
+    '</div>';
+}
+function renderSuppliesView(kid){
+  var kidsShown = isAllKids() ? DATA.kids : [kid];
+  var targetKid = isAllKids() ? ((ui.reqKidId && kidById(ui.reqKidId)) || DATA.kids[0]) : kid;
+  var kind = ui.reqKind || "prep", due = ui.reqDue || "", t = todayStr(), tm = shiftDate(t, 1);
+
+  var form = '<div class="req-form">' +
+    '<div class="req-form-title">✏️ 필요한 거 적기</div>' +
+    (isAllKids() ? '<div class="req-chips">' + DATA.kids.map(function(k){
+        var on = k.id === targetKid.id;
+        return '<button class="req-chip" style="'+(on?'background:'+k.color.border+';border-color:'+k.color.border+';color:#fff':'')+'" onclick="reqSet(\'reqKidId\',\''+k.id+'\',true)">'+esc(k.name)+'</button>';
+      }).join("") + '</div>' : '') +
+    '<div class="req-chips">' +
+      '<button class="req-chip'+(kind==="prep"?" on":"")+'" onclick="reqSet(\'reqKind\',\'prep\',true)">🎒 준비물</button>' +
+      '<button class="req-chip'+(kind==="buy"?" on":"")+'" onclick="reqSet(\'reqKind\',\'buy\',true)">🛒 사주세요</button>' +
+    '</div>' +
+    '<input class="req-input" placeholder="'+(kind==="buy"?"예: 실내화, 색연필 24색, 공책":"예: 색종이, 리코더, 체육복")+'" value="'+esc(ui.reqText||"")+'" oninput="reqSet(\'reqText\',this.value)" onkeydown="if(event.key===\'Enter\')addRequest()">' +
+    '<div class="req-chips" style="align-items:center">' +
+      '<span class="field-hint" style="margin:0">언제까지?</span>' +
+      '<button class="req-chip small'+(!due?" on":"")+'" onclick="reqSet(\'reqDue\',\'\',true)">언제든</button>' +
+      '<button class="req-chip small'+(due===t?" on":"")+'" onclick="reqSet(\'reqDue\',\''+t+'\',true)">오늘</button>' +
+      '<button class="req-chip small'+(due===tm?" on":"")+'" onclick="reqSet(\'reqDue\',\''+tm+'\',true)">내일</button>' +
+      '<input type="date" class="req-date" value="'+esc(due)+'" onchange="reqSet(\'reqDue\',this.value,true)">' +
+    '</div>' +
+    '<button class="btn-primary" style="width:100%;margin-top:4px" onclick="addRequest()">'+esc(targetKid.name)+' 요청하기</button>' +
+    '</div>';
+
+  var sections = kidsShown.map(function(k){
+    var open = openRequestItems(k.id);
+    var cutoff = shiftDate(t, -7);
+    var done = requestItems(k.id).concat(classSupplyItems(k.id))
+      .filter(function(r){ return r.status === "done" && (r.source === "class" || !r.doneDate || r.doneDate >= cutoff); });
+    var head = isAllKids() ? kidSectionHead(k, open.length ? '<span class="ks-extra" style="color:#0E4A78">요청 '+open.length+'개</span>' : '<span class="ks-extra">✓ 다 챙겼어요</span>') : '';
+    return head +
+      (open.length ? '<div class="req-list">'+open.map(renderRequestRow).join("")+'</div>' : '<div class="hw-tab-empty">필요한 게 생기면 위에 적어주세요 🙂</div>') +
+      (done.length ? '<div class="section-label" style="margin-top:6px;color:#8A7F6E">완료 (최근 7일)</div><div class="req-list">'+done.map(renderRequestRow).join("")+'</div>' : '');
+  }).join("");
+
+  var kcss = '--kc-border:'+kid.color.border+';--kc-bg:'+kid.color.bg+';--kc-text:'+kid.color.text+';--kc-soft:'+kid.color.soft;
+  return '<div class="panel" style="'+kcss+'">' +
+    '<div class="week-toolbar"><span class="week-label">🎒 '+esc(kid.name)+'의 준비물·요청</span>' +
+    '<button class="today-btn" onclick="shareRequests(\''+kidsShown.map(function(k){ return k.id; }).join(",")+'\')">카톡으로 보내기</button></div>' +
+    form + sections + '<div style="height:12px"></div></div>';
+}
+
 function renderPaymentView(kid){
   if (!ui.unlocked){
     var isSetup = !DATA.paymentPassword;
