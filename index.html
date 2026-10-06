@@ -334,6 +334,8 @@ button, input { font-family: inherit; }
 .kid-section-head .ks-extra { margin-left:auto; font-family:'Noto Sans KR', sans-serif; font-size:11.5px; font-weight:700; }
 .day-list.in-section { padding-bottom:4px; }
 .kid-lane-bg { position:absolute; top:0; bottom:0; pointer-events:none; opacity:0.35; }
+.paste-cta { width:100%; border:1.5px dashed #2E93E0; background:#F4F9FE; color:#0E4A78; border-radius:12px; padding:10px; font-size:13px; font-weight:800; cursor:pointer; font-family:inherit; }
+.paste-raw { width:100%; border:1.5px solid #CFE6FA; border-radius:12px; padding:10px 12px; font-size:16px; font-family:inherit; line-height:1.45; outline:none; resize:vertical; }
 /* 🎒 준비물 탭 */
 .dash-notice.req { background:#EAF6FF; color:#0E4A78; cursor:pointer; }
 .req-form { margin:14px 14px 4px; background:#F4F9FE; border:1.5px solid #CFE6FA; border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
@@ -457,6 +459,10 @@ function normalizeData(d){
   d.homeworkItems = d.homeworkItems || [];
   // 준비물·구매 요청: id를 키로 하는 객체 (기기 여러 대에서 동시에 추가해도 항목 단위로 합쳐지게)
   d.requests = (d.requests && typeof d.requests === "object" && !Array.isArray(d.requests)) ? d.requests : {};
+  // 학원 알림 받는 함: 휴대폰 자동화(MacroDroid/단축어)가 family-data/smsInbox 로 POST 하면 앱이 숙제로 옮김
+  d.smsInbox = (d.smsInbox && typeof d.smsInbox === "object" && !Array.isArray(d.smsInbox)) ? d.smsInbox : {};
+  // 보낸 사람(번호·카톡방) → 아이·수업 기억. 한 번 확인해 주면 다음부터 그 사람 알림은 자동으로 들어감
+  d.senderMap = (d.senderMap && typeof d.senderMap === "object" && !Array.isArray(d.senderMap)) ? d.senderMap : {};
   if (!d.appTitle) d.appTitle = "HAEYI SCHEDULER";
   return d;
 }
@@ -533,7 +539,7 @@ function remotePatch(text){
 
 /* 서버와 마지막으로 맞춘 상태(baseline)를 키별 JSON 문자열로 기억해 두고, 지금 DATA와 비교해 바뀐 부분만 PATCH 한다.
    attendance/homework/supplies는 항목 단위, 나머지는 최상위 키 단위로 비교. */
-var MAP_KEYS = { attendance:1, homework:1, supplies:1, requests:1 };
+var MAP_KEYS = { attendance:1, homework:1, supplies:1, requests:1, smsInbox:1, senderMap:1 };
 var SAFE_KEY = /^[^.$#\[\]\/]+$/;
 var BASE_KEY = "family-schedule-sync-base";
 var baseline = null, lastSeenTs = 0;
@@ -680,8 +686,9 @@ function saveLocalBackup(){
   try { localStorage.setItem("family-schedule-local-backup", JSON.stringify(DATA)); } catch(e){}
 }
 function pollOnce(){
-  if (!fbUrl || saving || ui.modal) return;
+  if (!fbUrl || saving || ui.modal || ui.pasteModal) return;
   if (!initialDone) { initialSync(); return; }
+  checkInbox();
   remoteGetTs().then(function(ts){
     if (hasLocalChanges()) { doSave(); return; }   // 못 보낸 변경분이 있으면 doSave가 병합까지 처리
     if (ts === lastSeenTs) {
@@ -1578,7 +1585,7 @@ function render(){
     document.getElementById("app").innerHTML = renderSetupScreen();
     return;
   }
-  document.getElementById("app").innerHTML = renderHeader() + renderBody() + renderModal() + renderAdminPrompt() + renderNoteModal() + renderDuplicateModal();
+  document.getElementById("app").innerHTML = renderHeader() + renderBody() + renderModal() + renderAdminPrompt() + renderNoteModal() + renderDuplicateModal() + renderPasteModal();
   renderSyncBadge();
   fitTextareas();
 }
@@ -1776,7 +1783,10 @@ function renderDashboard(){
     if (reqs.length) notices.push('<div class="dash-notice req" onclick="openSuppliesFor(\''+k.id+'\')">🎒 <b>'+esc(k.name)+'</b> 준비물·요청 '+reqs.length+'개 — ' +
       reqs.slice(0,3).map(function(r){ return (r.kind==="buy"?"🛒":"")+esc(r.text); }).join(", ")+(reqs.length>3?" 외":"")+' <span class="dash-link">보기 ›</span></div>');
   });
-  var summary = '<div class="dash-summary">' + (notices.length ? notices.join("") : '<div class="dash-notice ok">✅ 지금 확인할 것이 없어요</div>') + '</div>';
+  var reviewN = inboxReviewIds().length;
+  if (reviewN) notices.unshift('<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+reviewN+'개 — 숙제인지 앱이 확실히 몰라서 기다리고 있어요 <span class="dash-link">확인 ›</span></div>');
+  var summary = '<div class="dash-summary">' + (notices.length ? notices.join("") : '<div class="dash-notice ok">✅ 지금 확인할 것이 없어요</div>') +
+    '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button></div>';
 
   var cards = DATA.kids.map(function(k){
     var kcss = '--kc-border:'+k.color.border+';--kc-bg:'+k.color.bg+';--kc-text:'+k.color.text+';--kc-soft:'+k.color.soft;
@@ -2235,9 +2245,229 @@ function renderHomeworkView(kid){
 
   return '<div class="panel" style="'+kcss+'">' +
     '<div class="week-toolbar"><span class="week-label">'+esc(kid.name)+'의 숙제</span></div>' +
+    '<div style="padding:12px 14px 0;display:flex;flex-direction:column;gap:6px">' +
+    (inboxReviewIds().length ? '<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+inboxReviewIds().length+'개 <span class="dash-link">확인 ›</span></div>' : '') +
+    '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button></div>' +
     addForm + listHtml +
     '</div>';
 }
+/* ---------- 📋 학원 문자·카톡 붙여넣기 → 숙제 자동 입력 ---------- */
+// 과목 이름이 수업 이름과 달라도 연결되도록 (예: 문자엔 "Reading", 수업 이름은 "OO영어")
+var SUBJECT_WORDS = [
+  ["영어","english","eng","리딩","reading","파닉스","phonics","단어","voca","스피킹","라이팅"],
+  ["수학","math","연산","사고력","수익","쎈","개념원리","디딤돌"],
+  ["국어","독서","논술","글쓰기","한자"],
+  ["과학","science","실험"], ["코딩","coding"], ["피아노","piano"], ["미술","art"],
+  ["태권도"], ["수영"], ["바이올린","violin"], ["중국어","chinese"]
+];
+var PASTE_SKIP_LINE = /^(\[?web\s*발신\]?|\(광고\).*|안녕하세요.*|감사합니다.*|고맙습니다.*|좋은\s*(하루|저녁|밤|주말).*|.*수신\s*거부.*|.*무료\s*거부.*|.*080-?\d.*)$/i;
+var PASTE_STOP = /(감사합니다|고맙습니다|확인하겠습니다|좋은\s*(하루|저녁|밤|주말))/;   // 인사말이 나오면 숙제 내용 끝
+function guessClassTitle(kidId, text){
+  var lower = text.toLowerCase();
+  var titles = Array.from(new Set(DATA.classes.filter(function(c){ return c.kidId === kidId; }).map(function(c){ return c.title; })));
+  var best = null, bestScore = 0;
+  titles.forEach(function(t){
+    var score = 0, tl = t.toLowerCase();
+    var core = tl.replace(/학원|어학원|교실|센터|아카데미/g, "").trim();
+    if (lower.indexOf(tl) !== -1) score = 10;
+    else if (core.length >= 2 && lower.indexOf(core) !== -1) score = 8;
+    else if (tl.length >= 3 && lower.indexOf(tl.slice(0, 2)) !== -1) score = 7;   // 줄임말 (예: 청담어학원 → "청담")
+    if (score < 5) SUBJECT_WORDS.forEach(function(g){
+      if (g.some(function(w){ return tl.indexOf(w) !== -1; }) && g.some(function(w){ return lower.indexOf(w) !== -1; })) score = Math.max(score, 5);
+    });
+    if (score > bestScore) { bestScore = score; best = t; }
+  });
+  return { title:best, score:bestScore };
+}
+function extractHomeworkText(text){
+  var lines = text.replace(/\r/g, "").split("\n").map(function(s){ return s.trim(); });
+  var keep = function(l){ return l && !PASTE_SKIP_LINE.test(l) && !PASTE_STOP.test(l); };
+  var at = -1;
+  for (var i = 0; i < lines.length; i++) { if (/숙제|과제|homework|\bhw\b/i.test(lines[i])) { at = i; break; } }
+  if (at === -1) return lines.filter(keep).join("\n");
+  var out = [];
+  var first = lines[at].replace(/^.*?(숙제|과제|homework|hw)\s*(는|은)?\s*[:：\-]?\s*/i, "").trim();
+  if (first && !/^(안내|알려|공지|입니다|드립니다|있습니다)/.test(first) && !PASTE_STOP.test(first)) out.push(first);
+  for (var j = at + 1; j < lines.length; j++) {
+    if (!lines[j]) { if (out.length) break; else continue; }
+    if (PASTE_SKIP_LINE.test(lines[j]) || PASTE_STOP.test(lines[j])) break;
+    out.push(lines[j]);
+  }
+  return out.join("\n") || lines.filter(keep).join("\n");
+}
+// 그 수업의 가장 최근 수업일 (오늘 수업이 있으면 오늘)
+function lastSessionDate(kidId, title){
+  for (var back = 0; back <= 7; back++) {
+    var d = shiftDate(todayStr(), -back);
+    if (classesForDay(kidId, mondayIndex(d), d).some(function(c){ return c.title === title; })) return d;
+  }
+  return todayStr();
+}
+function senderKey(from){ return String(from || "").replace(/[^0-9A-Za-z가-힣]/g, "").slice(0, 60); }
+function parsePastedMessage(raw, from){
+  var text = raw || "";
+  var kidHits = DATA.kids.filter(function(k){ return text.indexOf(k.name) !== -1 || (k.name.length >= 3 && text.indexOf(k.name.slice(1)) !== -1); });
+  var kidId, guess;
+  var known = from && DATA.senderMap[senderKey(from)];
+  if (known && kidById(known.kidId)) {
+    // 전에 확인해 준 보낸 사람: 이름이 다른 아이로 적혀 있으면 그 아이, 아니면 기억한 아이
+    kidId = kidHits.length === 1 ? kidHits[0].id : known.kidId;
+    var hasTitle = DATA.classes.some(function(c){ return c.kidId === kidId && c.title === known.title; });
+    guess = hasTitle ? { title:known.title, score:9 } : guessClassTitle(kidId, text);
+  }
+  else if (kidHits.length === 1) { kidId = kidHits[0].id; guess = guessClassTitle(kidId, text); }
+  else {
+    // 이름이 없거나 여러 명이면 수업 이름이 가장 잘 맞는 아이로
+    var pool = kidHits.length ? kidHits : DATA.kids, best = null;
+    pool.forEach(function(k){ var g = guessClassTitle(k.id, text); if (!best || g.score > best.g.score) best = { k:k, g:g }; });
+    if (best && best.g.score > 0) { kidId = best.k.id; guess = best.g; }
+    else { kidId = (!isAllKids() && ui.selectedKidId) ? ui.selectedKidId : pool[0].id; guess = guessClassTitle(kidId, text); }
+  }
+  var title = guess.title || "";
+  // 자동 입력해도 될 만큼 확실한지: 숙제 단어가 있고, 수업을 찾았고, 아이가 분명할 때
+  var hasKeyword = /숙제|과제|homework|\bhw\b/i.test(text);
+  var sure = !!(hasKeyword && title && guess.score >= 5 && (kidHits.length === 1 || guess.score >= 7 || DATA.kids.length === 1));
+  return { kidId:kidId, title:title, date: title ? lastSessionDate(kidId, title) : todayStr(), hw: extractHomeworkText(text), sure:sure };
+}
+// 분석 결과를 숙제 칸에 넣고 안내 문구를 돌려줌 (itemId: 같은 알림이 두 번 들어와도 중복 안 되게)
+function applyParsedHomework(p, itemId){
+  var text = (p.hw || "").trim(), kid = kidById(p.kidId);
+  var cls = p.title ? classesForDay(p.kidId, mondayIndex(p.date), p.date).find(function(c){ return c.title === p.title; }) : null;
+  if (cls) {
+    var key = cls.id+"__"+p.date, cur = DATA.homework[key] || { text:"" };
+    if (!cur.text || cur.text.indexOf(text) === -1) {
+      DATA.homework[key] = Object.assign({}, cur, { text: cur.text ? cur.text + "\n" + text : text, status:"pending", done:false });
+    }
+    return (kid?kid.name:"")+" · "+p.title+" ("+formatMD(p.date)+")";
+  }
+  var id = itemId || uid();
+  if (!DATA.homeworkItems.some(function(h){ return h.id === id; })) {
+    DATA.homeworkItems.push({ id:id, kidId:p.kidId, date:p.date, text:(p.title ? "["+p.title+"] " : "")+text, status:"pending" });
+  }
+  return (kid?kid.name:"")+" 숙제 목록";
+}
+
+/* 학원 알림 받는 함 확인: 확실한 건 바로 숙제로, 애매한 건 '확인할 알림'으로 남겨둠 */
+var inboxBusy = false, inboxSeen = {};   // inboxSeen: 지우기가 서버에 반영되기 전 같은 알림을 또 처리하지 않도록
+function checkInbox(){
+  if (inboxBusy || !fbUrl || !initialDone || !baseline) return;
+  inboxBusy = true;
+  fetch(fbUrl + "family-data/smsInbox.json", { cache:"no-store" }).then(function(res){
+    if (!res.ok) throw new Error("status " + res.status);
+    return res.json();
+  }).then(function(map){
+    inboxBusy = false;
+    if (map && typeof map === "object") processInbox(map);
+  }).catch(function(){ inboxBusy = false; });
+}
+function processInbox(map){
+  var added = [], changed = false;
+  if (!baseline.smsInbox || typeof baseline.smsInbox !== "object") baseline.smsInbox = {};
+  Object.keys(map).forEach(function(id){
+    if (!SAFE_KEY.test(id) || inboxSeen[id]) return;
+    var raw = map[id], e = typeof raw === "string" ? { text:raw } : (raw || {});
+    if (DATA.smsInbox[id] && DATA.smsInbox[id].review) return;          // 이미 확인 대기 중
+    inboxSeen[id] = true;
+    baseline.smsInbox[id] = JSON.stringify(raw);                         // 서버에 있는 걸 알려줘야 지우기(null)가 전송됨
+    changed = true;
+    // 휴대폰 자동화가 줄바꿈을 " / " 로 바꿔 보내는 경우 다시 줄로 되돌림
+    var text = String(e.text || "").replace(/\s+\/\s+/g, "\n").trim();
+    if (!text) { delete DATA.smsInbox[id]; return; }
+    var p = parsePastedMessage(text, e.from);
+    if (p.sure && p.hw.trim()) { added.push(applyParsedHomework(p, "sms" + id.replace(/[^A-Za-z0-9]/g, ""))); delete DATA.smsInbox[id]; }
+    else DATA.smsInbox[id] = { text:text, from: e.from || "", at: e.at || Date.now(), review:true };
+  });
+  if (!changed) return;
+  scheduleSave(); requestRender();
+  if (added.length) showToast("📨 학원 알림에서 숙제를 자동으로 넣었어요: " + added.join(", "));
+}
+function inboxReviewIds(){ return Object.keys(DATA.smsInbox).filter(function(id){ return DATA.smsInbox[id] && DATA.smsInbox[id].review; }); }
+function openInboxReview(){
+  var id = inboxReviewIds()[0];
+  if (!id) return;
+  var text = DATA.smsInbox[id].text, from = DATA.smsInbox[id].from || "";
+  ui.pasteModal = { raw:text, parsed: parsePastedMessage(text, from), inboxId:id, from:from };
+  render();
+}
+function discardInbox(){
+  var id = ui.pasteModal && ui.pasteModal.inboxId;
+  if (id) delete DATA.smsInbox[id];
+  ui.pasteModal = null;
+  scheduleSave(); render();
+  if (inboxReviewIds().length) openInboxReview();
+}
+function copyInboxUrl(){
+  var url = fbUrl + "family-data/smsInbox.json";
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(function(){ showToast("자동 연동 주소를 복사했어요."); });
+  else showToast(url);
+}
+function openPasteModal(){ ui.pasteModal = { raw:"", parsed:null }; render(); setTimeout(function(){ var el = document.getElementById("paste-raw"); if (el) el.focus(); }, 0); }
+function closePasteModal(){ ui.pasteModal = null; render(); }
+function pasteFromClipboard(){
+  if (!navigator.clipboard || !navigator.clipboard.readText) { showToast("이 브라우저는 자동 붙여넣기가 안 돼요. 칸을 길게 눌러 붙여넣어 주세요."); return; }
+  navigator.clipboard.readText().then(function(t){ ui.pasteModal.raw = t || ""; analyzePaste(); })
+    .catch(function(){ showToast("붙여넣기 권한이 없어요. 칸을 길게 눌러 붙여넣어 주세요."); });
+}
+function analyzePaste(){
+  var raw = (ui.pasteModal.raw || "").trim();
+  if (!raw) { showToast("학원에서 온 문자나 카톡을 먼저 붙여넣어 주세요."); return; }
+  ui.pasteModal.parsed = parsePastedMessage(raw);
+  render();
+}
+function pasteSet(field, value, rerender){
+  var p = ui.pasteModal.parsed;
+  p[field] = value;
+  if (field === "kidId") { var g = guessClassTitle(value, ui.pasteModal.raw); p.title = g.title || ""; p.date = p.title ? lastSessionDate(value, p.title) : todayStr(); }
+  if (field === "title" && value) p.date = lastSessionDate(p.kidId, value);
+  if (rerender) render();
+}
+function savePastedHomework(){
+  var p = ui.pasteModal.parsed;
+  if (!(p.hw || "").trim()) { showToast("숙제 내용이 비어 있어요."); return; }
+  var where = applyParsedHomework(p);
+  var inboxId = ui.pasteModal.inboxId, sk = senderKey(ui.pasteModal.from);
+  if (inboxId) delete DATA.smsInbox[inboxId];
+  if (inboxId && sk && p.title) DATA.senderMap[sk] = { kidId:p.kidId, title:p.title, name:String(ui.pasteModal.from).slice(0, 40) };
+  ui.pasteModal = null;
+  scheduleSave(); render();
+  showToast(where + " 숙제에 넣었어요!");
+  if (inboxId && inboxReviewIds().length) openInboxReview();   // 확인할 알림이 더 있으면 이어서
+}
+function renderPasteModal(){
+  var m = ui.pasteModal;
+  if (!m) return "";
+  var body;
+  if (!m.parsed) {
+    body = '<div class="field-hint" style="margin:0 0 8px">학원에서 온 <b>문자나 카톡을 길게 눌러 복사</b>한 다음, 아래 칸에 붙여넣고 <b>숙제 찾기</b>를 누르세요. 아이·수업·숙제 내용을 앱이 알아서 찾아요.</div>' +
+      '<textarea id="paste-raw" class="paste-raw" rows="7" placeholder="여기에 붙여넣기" oninput="ui.pasteModal.raw=this.value">'+esc(m.raw)+'</textarea>' +
+      '<div class="modal-actions">' +
+      (navigator.clipboard && navigator.clipboard.readText ? '<button class="btn-danger" style="background:#EAF6FF;color:#0E4A78" onclick="pasteFromClipboard()">📋 복사한 것 가져오기</button>' : '') +
+      '<button class="btn-primary" onclick="analyzePaste()">숙제 찾기</button></div>' +
+      (ui.adminUnlocked && fbUrl ? '<div class="field-hint" style="margin-top:12px;text-align:center">휴대폰 자동 연동(MacroDroid·단축어)을 설정할 때 쓰는 주소: <button class="dash-link" style="color:#0E4A78" onclick="copyInboxUrl()">자동 연동 주소 복사</button></div>' : '');
+  } else {
+    var p = m.parsed;
+    var titles = Array.from(new Set(DATA.classes.filter(function(c){ return c.kidId === p.kidId && c.type !== "학교"; }).map(function(c){ return c.title; })));
+    body = (DATA.kids.length > 1 ? '<div class="field"><label>누구 숙제?</label><div class="req-chips">' + DATA.kids.map(function(k){
+        var on = k.id === p.kidId;
+        return '<button class="req-chip" style="'+(on?'background:'+k.color.border+';border-color:'+k.color.border+';color:#fff':'')+'" onclick="pasteSet(\'kidId\',\''+k.id+'\',true)">'+esc(k.name)+'</button>';
+      }).join("") + '</div></div>' : '') +
+      '<div class="field"><label>어느 수업?</label><div class="req-chips">' + titles.map(function(t){
+        return '<button class="req-chip'+(t===p.title?" on":"")+'" onclick="pasteSet(\'title\',\''+esc(t).replace(/'/g,"\\'")+'\',true)">'+esc(t)+'</button>';
+      }).join("") + '<button class="req-chip'+(!p.title?" on":"")+'" onclick="pasteSet(\'title\',\'\',true)">기타</button></div>' +
+      (!p.title ? '<div class="field-hint">수업을 못 찾았어요. 맞는 수업을 눌러 주세요.</div>' : '') + '</div>' +
+      '<div class="field"><label>수업 날짜</label><input type="date" value="'+esc(p.date)+'" onchange="pasteSet(\'date\',this.value)"></div>' +
+      '<div class="field"><label>숙제 내용 (고칠 수 있어요)</label><textarea class="paste-raw" rows="5" oninput="ui.pasteModal.parsed.hw=this.value">'+esc(p.hw)+'</textarea></div>' +
+      (m.inboxId ? '<div class="field-hint" style="margin:-4px 0 10px">📨 휴대폰에서 자동으로 받은 학원 알림이에요. 숙제가 아니면 <b>버리기</b>를 누르세요.</div>' : '') +
+      '<div class="modal-actions">' +
+      (m.inboxId
+        ? '<button class="btn-danger" onclick="discardInbox()">버리기</button>'
+        : '<button class="btn-danger" style="background:#F0EAD9;color:#6B6153" onclick="ui.pasteModal.parsed=null;render()">다시 붙여넣기</button>') +
+      '<button class="btn-primary" onclick="savePastedHomework()">숙제 칸에 넣기</button></div>';
+  }
+  return '<div class="modal-overlay" onclick="closePasteModal()"><div class="modal" onclick="event.stopPropagation()">' +
+    '<h3>📋 학원 알림으로 숙제 넣기<button class="modal-close" onclick="closePasteModal()">✕</button></h3>' + body + '</div></div>';
+}
+
 /* ---------- 🎒 준비물 탭: 아이들이 준비물·사줄 물건을 요청하고, 부모님이 챙기면 체크 ---------- */
 var CLASS_SUPPLY_DAYS = 7;   // 수업 줄에 적힌 준비물은 앞뒤 7일 것만 모아서 보여줌
 function requestItems(kidId){
