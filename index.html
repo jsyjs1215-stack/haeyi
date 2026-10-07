@@ -2374,7 +2374,8 @@ function processInbox(map){
     var text = String(e.text || "").replace(/\s+\/\s+/g, "\n").trim();
     if (!text) { delete DATA.smsInbox[id]; return; }
     var p = parsePastedMessage(text, e.from);
-    if (p.sure && p.hw.trim()) { added.push(applyParsedHomework(p, "sms" + id.replace(/[^A-Za-z0-9]/g, ""))); delete DATA.smsInbox[id]; }
+    // manual: 엄마가 직접 골라 보낸 알림(단축어 공유/뒷면 탭) → 수업만 찾으면 숙제로 바로 넣음
+    if ((p.sure || (e.manual && p.title)) && p.hw.trim()) { added.push(applyParsedHomework(p, "sms" + id.replace(/[^A-Za-z0-9]/g, ""))); delete DATA.smsInbox[id]; }
     else DATA.smsInbox[id] = { text:text, from: e.from || "", at: e.at || Date.now(), review:true };
   });
   if (!changed) return;
