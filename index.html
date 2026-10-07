@@ -335,6 +335,16 @@ button, input { font-family: inherit; }
 .day-list.in-section { padding-bottom:4px; }
 .kid-lane-bg { position:absolute; top:0; bottom:0; pointer-events:none; opacity:0.35; }
 .paste-cta { width:100%; border:1.5px dashed #2E93E0; background:#F4F9FE; color:#0E4A78; border-radius:12px; padding:10px; font-size:13px; font-weight:800; cursor:pointer; font-family:inherit; }
+/* 👧 아이 화면 / 👩 부모 화면 */
+.mode-switch { display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#F0EAD9; padding:4px; border-radius:16px; margin-bottom:14px; }
+.ms-btn { border:none; background:transparent; color:#8A7F6E; padding:10px 6px; border-radius:12px; font-size:14px; font-weight:800; cursor:pointer; font-family:inherit; }
+.ms-btn.on.kid { background:#FF6B4A; color:#fff; box-shadow:0 2px 6px rgba(255,107,74,0.3); }
+.ms-btn.on.parent { background:#5B21B6; color:#fff; box-shadow:0 2px 6px rgba(91,33,182,0.3); }
+.header.parent-mode .brand-sub { color:#5B21B6; font-weight:600; }
+.view-switch.parent { background:#EEE8FB; }
+.view-switch.parent .view-btn.active { background:#5B21B6; }
+.hw-readonly { flex:1; min-width:0; font-size:13.5px; color:#4A4238; padding:4px 0; white-space:pre-wrap; word-break:break-word; }
+.hw-readonly.empty { color:#C7BCA3; font-size:12.5px; }
 .paste-lines { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow-y:auto; }
 .paste-line { display:flex; align-items:flex-start; gap:8px; text-align:left; border:1.5px solid #E8DFCB; background:#fff; color:#9C9282; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; cursor:pointer; line-height:1.4; }
 .paste-line.on { border-color:#14B8A0; background:#EAFBF6; color:#0B5C50; font-weight:700; }
@@ -747,6 +757,7 @@ function init(){
     if (backup) DATA = JSON.parse(backup);
   } catch(e){}
   try { ui.selectedKidId = localStorage.getItem(SEL_KID_KEY) || null; } catch(e){}
+  try { if (localStorage.getItem(PARENT_KEY) === "1") { ui.adminUnlocked = true; ui.unlocked = true; } } catch(e){}
   normalizeAll();
   ensureSelectedKid();
 
@@ -808,7 +819,7 @@ function initialSync(){
     saveBaseline();
     syncStatus = "synced"; lastSyncError = "";
     requestRender();
-    if (!syncToastShown) { syncToastShown = true; showToast("가족과 동기화됐어요! 위의 '공유 링크 복사'를 눌러 가족에게 보내주세요."); }
+    if (!syncToastShown) { syncToastShown = true; showToast(isParent() ? "가족과 동기화됐어요! 위의 '공유 링크 복사'를 눌러 가족에게 보내주세요." : "가족과 동기화됐어요!"); }
     if (hasLocalChanges()) doSave();
   }).catch(function(e){
     initialRunning = false;
@@ -1174,6 +1185,7 @@ function selectKid(id){
   render();
 }
 function goToView(v){
+  if (!isParent() && !KID_VIEWS[v]) v = "today";
   if (ui.view === "payment" && v !== "payment") ui.unlocked = false;
   ui.modal = null;
   ui.noteModal = null;
@@ -1525,23 +1537,34 @@ function submitPassword(){
     if (ui.pwInput === DATA.paymentPassword){ ui.unlocked = true; ui.adminUnlocked = true; ui.showAdminPrompt = false; ui.pwInput = ""; }
     else { ui.pwError = "비밀번호가 맞지 않아요."; }
   }
+  if (ui.adminUnlocked && ui.rememberParent) { try { localStorage.setItem(PARENT_KEY, "1"); } catch(e){} }
   render();
 }
 function lockPayment(){ ui.unlocked = false; render(); }
 function resetPassword(){
   if (!confirm("비밀번호를 초기화할까요? 다음에 들어갈 때 새로 설정하게 돼요.")) return;
   DATA.paymentPassword = null; ui.unlocked = false; ui.adminUnlocked = false; ui.pwInput = ""; ui.pwConfirm = "";
+  try { localStorage.removeItem(PARENT_KEY); } catch(e){}
+  if (!KID_VIEWS[ui.view]) ui.view = "today";
   scheduleSave(); render();
 }
-function toggleAdmin(){
-  if (ui.adminUnlocked) {
-    if (!confirm("관리자 모드를 잠글까요? 일정 추가·수정·삭제는 다시 비밀번호를 입력해야 할 수 있어요.")) return;
-    ui.adminUnlocked = false; ui.unlocked = false; ui.modal = null; render(); return;
-  }
+/* ---------- 👧 아이 화면 / 👩 부모 화면 ---------- */
+var PARENT_KEY = "family-schedule-parent-device";   // "1"이면 이 기기는 항상 부모 화면으로 열림
+var KID_VIEWS = { today:1, attendance:1, homework:1, supplies:1, detail:1, overview:1 };
+function isParent(){ return !!ui.adminUnlocked; }
+function switchToKid(){
+  ui.adminUnlocked = false; ui.unlocked = false; ui.modal = null; ui.pasteModal = null;
+  try { localStorage.removeItem(PARENT_KEY); } catch(e){}
+  if (!KID_VIEWS[ui.view]) ui.view = "today";
+  render();
+}
+function switchToParent(){
+  if (ui.adminUnlocked) return;
   ui.showAdminPrompt = true; ui.pwInput = ""; ui.pwConfirm = ""; ui.pwError = "";
   render();
   setTimeout(function(){ var el = document.getElementById("admin-pw-input"); if (el) el.focus(); }, 0);
 }
+function toggleAdmin(){ if (ui.adminUnlocked) switchToKid(); else switchToParent(); }
 function closeAdminPrompt(){ ui.showAdminPrompt = false; ui.pwInput = ""; ui.pwConfirm = ""; ui.pwError = ""; render(); }
 function updateGroupField(idsStr, field, value){
   var ids = idsStr.split(",");
@@ -1684,16 +1707,21 @@ function renderHeader(){
       ? '<div class="add-kid-inline"><input id="new-kid-input" placeholder="아이 이름" value="'+esc(ui.newKidName)+'" oninput="onNewKidInput(this.value)" onkeydown="if(event.key===\'Enter\')addKid()"><button onclick="addKid()">추가</button></div>'
       : '<button class="add-kid-btn" onclick="startAddKid()">+ 아이 추가</button>';
   }
-  var adminBtn = ui.adminUnlocked
-    ? '<button class="share-btn" style="background:#14B8A0" onclick="toggleAdmin()">🔓 관리자 모드</button>'
-    : '<button class="share-btn" style="background:#8A7F6E" onclick="toggleAdmin()">🔒 관리자 잠금</button>';
+  var parent = isParent();
+  var modeSwitch = '<div class="mode-switch">' +
+    '<button class="ms-btn'+(!parent?" on kid":"")+'" onclick="switchToKid()">👧 아이 화면</button>' +
+    '<button class="ms-btn'+(parent?" on parent":"")+'" onclick="switchToParent()">👩 부모 화면'+(parent?"":" 🔒")+'</button>' +
+    '</div>';
 
-  return '<div class="header">' +
+  return '<div class="header'+(parent?" parent-mode":"")+'">' +
+    modeSwitch +
     '<div class="brand-row">'+titleHtml+'</div>' +
-    '<p class="brand-sub">아이들은 출석·숙제·준비물만 체크할 수 있어요. 일정 관리는 관리자 모드에서만 가능해요.</p>' +
+    '<p class="brand-sub">'+(parent
+      ? "👩 부모 화면 — 숙제 입력, 일정·휴일 관리, 등록현황을 할 수 있어요."
+      : "👧 아이 화면 — 오늘 일정, 출석, 숙제 확인, 준비물 요청을 할 수 있어요.")+'</p>' +
     '<div class="sync-row"><span id="sync-badge" class="sync-badge sync-connecting">연결 중...</span>' +
-    '<button class="share-btn" onclick="copyShareLink()">공유 링크 복사</button>' + adminBtn +
-    (ui.adminUnlocked ? '<button class="share-btn" style="background:#8A7F6E" onclick="resetSyncSetup()">동기화 주소 재설정</button>' : '') +
+    (parent ? '<button class="share-btn" onclick="copyShareLink()">공유 링크 복사</button>' +
+      '<button class="share-btn" style="background:#8A7F6E" onclick="resetSyncSetup()">동기화 주소 재설정</button>' : '') +
     '</div>' +
     '<div id="sync-detail" style="display:none;font-size:11px;color:#9C9282;margin-top:4px"></div>' +
     '<div class="kid-tabs">'+allTab+kidTabs+addKidHtml+'</div>' +
@@ -1704,11 +1732,12 @@ function renderAdminPrompt(){
   if (!ui.showAdminPrompt) return "";
   var isSetup = !DATA.paymentPassword;
   return '<div class="modal-overlay" onclick="closeAdminPrompt()"><div class="modal" onclick="event.stopPropagation()">' +
-    '<h3>관리자 모드<button class="modal-close" onclick="closeAdminPrompt()">✕</button></h3>' +
+    '<h3>👩 부모 화면<button class="modal-close" onclick="closeAdminPrompt()">✕</button></h3>' +
     '<div class="lock-screen" style="padding:8px 4px 4px">' +
-    '<p style="margin-top:0">'+(isSetup ? "비밀번호를 새로 설정해주세요." : "비밀번호를 입력하면 일정 추가·수정·삭제가 가능해져요.")+'</p>' +
+    '<p style="margin-top:0">'+(isSetup ? "부모 화면 비밀번호를 새로 정해주세요. (아이들에겐 알려주지 마세요)" : "비밀번호를 입력하면 부모 화면으로 바뀌어요.")+'</p>' +
     '<input id="admin-pw-input" type="password" class="lock-input" placeholder="비밀번호" value="'+esc(ui.pwInput)+'" oninput="onPwInput(this.value)" onkeydown="if(event.key===\'Enter\' && '+(isSetup?"false":"true")+')submitPassword()">' +
     (isSetup ? '<input type="password" class="lock-input" placeholder="비밀번호 확인" value="'+esc(ui.pwConfirm)+'" oninput="onPwConfirmInput(this.value)" onkeydown="if(event.key===\'Enter\')submitPassword()">' : '') +
+    '<label class="checkbox-label" style="color:#6B6153;margin:4px 0 6px;font-size:12.5px"><input type="checkbox" '+(ui.rememberParent?"checked":"")+' onchange="ui.rememberParent=this.checked"> 이 휴대폰은 엄마·아빠 폰이에요 (다음부터 바로 부모 화면으로 열기)</label>' +
     (ui.pwError ? '<div class="lock-error">'+esc(ui.pwError)+'</div>' : '') +
     '<button class="btn-primary" style="margin-top:6px" onclick="submitPassword()">'+(isSetup?"설정하고 시작":"확인")+'</button>' +
     '</div></div></div>';
@@ -1720,16 +1749,20 @@ function renderBody(){
   }
   var kid = selectedKid();
   if (!kid) return "";
+  if (!isParent() && !KID_VIEWS[ui.view]) ui.view = "today";   // 아이 화면에선 부모 전용 탭으로 못 감
   var hwCount = viewKidIds(kid).reduce(function(s, id){ return s + homeworkPendingCount(id); }, 0);
-  var switchHtml = '<div class="view-switch">' +
-    tabBtn('today','🏠 오늘') + tabBtn('detail','요일별') + tabBtn('attendance','출석체크') +
-    '<button class="view-btn'+(ui.view==="homework"?" active":"")+(hwCount?" tab-alert":"")+'" onclick="goToView(\'homework\')">📝 숙제'+(hwCount?' <span class="tab-badge">'+hwCount+'</span>':'')+'</button>' +
-    (function(){
-      var rc = viewKidIds(kid).reduce(function(s, id){ return s + openRequestCount(id); }, 0);
-      return '<button class="view-btn'+(ui.view==="supplies"?" active":"")+'" onclick="goToView(\'supplies\')">🎒 준비물'+(rc?' <span class="tab-badge" style="background:#2E93E0">'+rc+'</span>':'')+'</button>';
-    })() +
-    tabBtn('overview','전체보기') + tabBtn('payment','🔒 등록현황') +
-    '</div>';
+  var rc = viewKidIds(kid).reduce(function(s, id){ return s + openRequestCount(id); }, 0);
+  var hwTab = function(label){ return '<button class="view-btn'+(ui.view==="homework"?" active":"")+(hwCount?" tab-alert":"")+'" onclick="goToView(\'homework\')">'+label+(hwCount?' <span class="tab-badge">'+hwCount+'</span>':'')+'</button>'; };
+  var supTab = function(label){ return '<button class="view-btn'+(ui.view==="supplies"?" active":"")+'" onclick="goToView(\'supplies\')">'+label+(rc?' <span class="tab-badge" style="background:#2E93E0">'+rc+'</span>':'')+'</button>'; };
+  var switchHtml = isParent()
+    ? '<div class="view-switch parent">' +
+        tabBtn('today','🏠 오늘') + hwTab('📝 숙제 입력·관리') + supTab('🎒 준비물 요청') +
+        tabBtn('attendance','✅ 출석') + tabBtn('detail','🗓 일정 관리') + tabBtn('overview','📅 달력·휴일') + tabBtn('payment','💰 등록현황') +
+      '</div>'
+    : '<div class="view-switch">' +
+        tabBtn('today','🏠 오늘') + tabBtn('attendance','✅ 출석체크') + hwTab('📝 숙제') + supTab('🎒 준비물') +
+        tabBtn('detail','🗓 시간표') + tabBtn('overview','📅 달력') +
+      '</div>';
 
   var content = "";
   if (ui.view === "detail") content = renderGridView(kid);
@@ -1789,9 +1822,9 @@ function renderDashboard(){
       reqs.slice(0,3).map(function(r){ return (r.kind==="buy"?"🛒":"")+esc(r.text); }).join(", ")+(reqs.length>3?" 외":"")+' <span class="dash-link">보기 ›</span></div>');
   });
   var reviewN = inboxReviewIds().length;
-  if (reviewN) notices.unshift('<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+reviewN+'개 — 숙제인지 앱이 확실히 몰라서 기다리고 있어요 <span class="dash-link">확인 ›</span></div>');
+  if (reviewN && isParent()) notices.unshift('<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+reviewN+'개 — 숙제인지 앱이 확실히 몰라서 기다리고 있어요 <span class="dash-link">확인 ›</span></div>');
   var summary = '<div class="dash-summary">' + (notices.length ? notices.join("") : '<div class="dash-notice ok">✅ 지금 확인할 것이 없어요</div>') +
-    '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button></div>';
+    (isParent() ? '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button>' : '') + '</div>';
 
   var cards = DATA.kids.map(function(k){
     var kcss = '--kc-border:'+k.color.border+';--kc-bg:'+k.color.bg+';--kc-text:'+k.color.text+';--kc-soft:'+k.color.soft;
@@ -1980,7 +2013,9 @@ function renderClassRow(c, dateForRow, hideKidTag){
       : '') +
     '<div class="hw-row hw-'+hwSt+'"><span class="mini-label">숙제</span>' +
     '<span class="hw-accent-dot" style="background:'+accent+'"></span>' +
-    '<textarea class="hw-input hw-textarea" rows="1" placeholder="수업이 끝난 후 나온 숙제를 적어주세요" oninput="onHomeworkInput(\''+c.id+'\',\''+dateForRow+'\',this.value);autoGrow(this)" onblur="blurHomework()">'+esc(hw.text)+'</textarea>' +
+    (isParent()
+      ? '<textarea class="hw-input hw-textarea" rows="1" placeholder="수업이 끝난 후 나온 숙제를 적어주세요" oninput="onHomeworkInput(\''+c.id+'\',\''+dateForRow+'\',this.value);autoGrow(this)" onblur="blurHomework()">'+esc(hw.text)+'</textarea>'
+      : '<div class="hw-readonly'+(hw.text?"":" empty")+'">'+(hw.text ? esc(hw.text) : "아직 적힌 숙제가 없어요")+'</div>') +
     '<button class="hw-stamp" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+dateForRow+'\')">'+hwStyle.label+'</button>' +
     '</div>' +
     '<div class="prep-row"><span class="mini-label">준비물</span>' +
@@ -2250,9 +2285,11 @@ function renderHomeworkView(kid){
 
   return '<div class="panel" style="'+kcss+'">' +
     '<div class="week-toolbar"><span class="week-label">'+esc(kid.name)+'의 숙제</span></div>' +
-    '<div style="padding:12px 14px 0;display:flex;flex-direction:column;gap:6px">' +
-    (inboxReviewIds().length ? '<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+inboxReviewIds().length+'개 <span class="dash-link">확인 ›</span></div>' : '') +
-    '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button></div>' +
+    (isParent()
+      ? '<div style="padding:12px 14px 0;display:flex;flex-direction:column;gap:6px">' +
+        (inboxReviewIds().length ? '<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+inboxReviewIds().length+'개 <span class="dash-link">확인 ›</span></div>' : '') +
+        '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button></div>'
+      : '<div class="field-hint" style="padding:10px 14px 0">숙제를 다 하면 <b>미완료</b> 버튼을 눌러 <b>완료</b>로 바꿔주세요 ✓</div>') +
     addForm + listHtml +
     '</div>';
 }
