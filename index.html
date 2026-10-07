@@ -345,6 +345,13 @@ button, input { font-family: inherit; }
 .view-switch.parent .view-btn.active { background:#5B21B6; }
 .hw-readonly { flex:1; min-width:0; font-size:13.5px; color:#4A4238; padding:4px 0; white-space:pre-wrap; word-break:break-word; }
 .hw-readonly.empty { color:#C7BCA3; font-size:12.5px; }
+.who-panel { padding:26px 18px 22px; display:flex; flex-direction:column; gap:10px; }
+.who-title { font-family:'Jua', sans-serif; font-size:22px; text-align:center; color:#4A4238; }
+.who-btn { border:2px solid; border-radius:16px; padding:16px; font-size:18px; font-family:inherit; cursor:pointer; }
+.who-btn b { font-size:21px; }
+.me-bar { display:flex; align-items:center; gap:7px; margin-top:14px; padding:9px 14px; border-radius:14px; background:var(--kc-soft); border-left:5px solid var(--kc-border); color:var(--kc-text); font-size:15px; }
+.me-bar b { font-family:'Jua', sans-serif; font-size:18px; font-weight:400; }
+.me-change { margin-left:auto; border:none; background:none; color:#9C9282; font-size:11.5px; text-decoration:underline; cursor:pointer; font-family:inherit; }
 .paste-lines { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow-y:auto; }
 .paste-line { display:flex; align-items:flex-start; gap:8px; text-align:left; border:1.5px solid #E8DFCB; background:#fff; color:#9C9282; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; cursor:pointer; line-height:1.4; }
 .paste-line.on { border-color:#14B8A0; background:#EAFBF6; color:#0B5C50; font-weight:700; }
@@ -758,6 +765,7 @@ function init(){
   } catch(e){}
   try { ui.selectedKidId = localStorage.getItem(SEL_KID_KEY) || null; } catch(e){}
   try { if (localStorage.getItem(PARENT_KEY) === "1") { ui.adminUnlocked = true; ui.unlocked = true; } } catch(e){}
+  try { ui.meKidId = localStorage.getItem(ME_KEY) || null; } catch(e){}
   normalizeAll();
   ensureSelectedKid();
 
@@ -1033,11 +1041,44 @@ function kidHasAbsentToday(kidId){
 var ALL_KIDS = "__all__";
 var ALL_KID_COLOR = { bg:"#F0EAD9", border:"#4A4238", text:"#4A4238", soft:"#F5EFDE" };
 var SEL_KID_KEY = "family-schedule-selected-kid";
-function isAllKids(){ return ui.selectedKidId === ALL_KIDS; }
+// 아이 화면에선 "모두"가 없고, 이 기기 주인(ME_KEY로 기억한 아이) 화면만 보임
+var ME_KEY = "family-schedule-me";
+function isAllKids(){ return isParent() && ui.selectedKidId === ALL_KIDS; }
 function kidById(id){ return DATA.kids.find(function(k){ return k.id === id; }) || null; }
+function meKid(){
+  if (DATA.kids.length === 1) return DATA.kids[0];
+  return kidById(ui.meKidId);
+}
 function selectedKid(){
+  if (!isParent()) return meKid();
   if (isAllKids()) return { id:ALL_KIDS, name:"모두", color:ALL_KID_COLOR };
   return kidById(ui.selectedKidId);
+}
+function currentKidId(){ var k = selectedKid(); return k && k.id !== ALL_KIDS ? k.id : null; }
+function visibleKids(){ if (isParent()) return DATA.kids; var me = meKid(); return me ? [me] : []; }
+function setMe(id){
+  ui.meKidId = id;
+  try { localStorage.setItem(ME_KEY, id); } catch(e){}
+  ui.view = "today";
+  render();
+}
+function clearMe(){
+  if (!confirm("다른 아이로 바꿀까요?")) return;
+  ui.meKidId = null;
+  try { localStorage.removeItem(ME_KEY); } catch(e){}
+  render();
+}
+// 받침이 있으면 "이에요", 없으면 "예요" (이린 → 이린이에요, 해이 → 해이예요)
+function iEyo(name){
+  var c = name.charCodeAt(name.length - 1);
+  return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0) ? "이에요" : "예요";
+}
+function renderWhoAmI(){
+  return '<div class="panel who-panel"><div class="who-title">👋 안녕! 누구예요?</div>' +
+    '<div class="field-hint" style="text-align:center;margin:0 0 14px">한 번만 고르면, 다음부터 이 폰에선 내 화면이 바로 열려요.</div>' +
+    DATA.kids.map(function(k){
+      return '<button class="who-btn" style="background:'+k.color.bg+';border-color:'+k.color.border+';color:'+k.color.text+'" onclick="setMe(\''+k.id+'\')">나는 <b>'+esc(k.name)+'</b>'+iEyo(k.name)+'</button>';
+    }).join("") + '</div>';
 }
 function viewKidIds(kid){ return kid.id === ALL_KIDS ? DATA.kids.map(function(k){ return k.id; }) : [kid.id]; }
 function classesForView(kid, dayIdx, dateForDay){
@@ -1690,8 +1731,8 @@ function renderHeader(){
     return '<div class="kid-tab'+(active?" active":"")+'" style="--kc-border:'+k.color.border+';--kc-bg:'+k.color.bg+';--kc-text:'+k.color.text+'" onclick="selectKid(\''+k.id+'\')">' +
       '<span class="dot"></span><span class="'+(needsArrival?"kid-name-blink":"")+'" title="'+(needsArrival?"학원 도착 시간이 지났는데 출석 확인이 안 됐어요":"")+'">'+esc(k.name)+'</span>' +
       (hwCount ? '<span class="tab-badge" title="숙제 미완료 '+hwCount+'개">'+hwCount+'</span>' : '') +
-      (needsArrival ? '<button class="kid-share-btn arrival" title="출석 알림 카톡으로 보내기" onclick="event.stopPropagation();shareArrivalAlert(\''+k.id+'\')">⏰💬</button>' : '') +
-      (hwCount ? '<button class="kid-share-btn hw" title="숙제 알림 카톡으로 보내기" onclick="event.stopPropagation();shareHomeworkAlert(\''+k.id+'\')">📝💬</button>' : '') +
+      (needsArrival && isParent() ? '<button class="kid-share-btn arrival" title="출석 알림 카톡으로 보내기" onclick="event.stopPropagation();shareArrivalAlert(\''+k.id+'\')">⏰💬</button>' : '') +
+      (hwCount && isParent() ? '<button class="kid-share-btn hw" title="숙제 알림 카톡으로 보내기" onclick="event.stopPropagation();shareHomeworkAlert(\''+k.id+'\')">📝💬</button>' : '') +
       (kidHasAbsentToday(k.id) ? '<span class="alert-dot" title="오늘 결석 있음"></span>' : '') +
       (ui.adminUnlocked ? '<span class="kid-tab-del" onclick="event.stopPropagation();removeKid(\''+k.id+'\')">✕</span>' : '') +
       '</div>';
@@ -1724,7 +1765,11 @@ function renderHeader(){
       '<button class="share-btn" style="background:#8A7F6E" onclick="resetSyncSetup()">동기화 주소 재설정</button>' : '') +
     '</div>' +
     '<div id="sync-detail" style="display:none;font-size:11px;color:#9C9282;margin-top:4px"></div>' +
-    '<div class="kid-tabs">'+allTab+kidTabs+addKidHtml+'</div>' +
+    (parent
+      ? '<div class="kid-tabs">'+allTab+kidTabs+addKidHtml+'</div>'
+      : (meKid() ? '<div class="me-bar" style="--kc-border:'+meKid().color.border+';--kc-soft:'+meKid().color.soft+';--kc-text:'+meKid().color.text+'">' +
+          '<span class="kid-section-dot"></span><b>'+esc(meKid().name)+'</b>의 화면' +
+          (DATA.kids.length > 1 ? '<button class="me-change" onclick="clearMe()">내가 아니에요</button>' : '') + '</div>' : '')) +
     '</div>';
 }
 
@@ -1747,6 +1792,7 @@ function renderBody(){
   if (DATA.kids.length === 0){
     return '<div class="empty-state"><h3>아직 등록된 아이가 없어요</h3><p>위의 "아이 추가" 버튼으로 첫 번째 아이를 등록해 보세요.</p></div>';
   }
+  if (!isParent() && !meKid()) return renderWhoAmI();           // 아이 화면 처음: 본인 고르기
   var kid = selectedKid();
   if (!kid) return "";
   if (!isParent() && !KID_VIEWS[ui.view]) ui.view = "today";   // 아이 화면에선 부모 전용 탭으로 못 감
@@ -1809,11 +1855,11 @@ function renderDashboard(){
 
   // 확인할 것 요약
   var notices = [];
-  DATA.kids.forEach(function(k){
+  visibleKids().forEach(function(k){
     if (isToday) {
       var late = lateClasses(k.id);
       if (late.length) notices.push('<div class="dash-notice warn">⏰ <b>'+esc(k.name)+'</b> 출석 확인 필요 — '+late.map(function(c){ return esc(c.title)+'('+c.start+')'; }).join(", ") +
-        ' <button class="dash-link" onclick="shareArrivalAlert(\''+k.id+'\')">카톡 알림</button></div>');
+        (isParent() ? ' <button class="dash-link" onclick="shareArrivalAlert(\''+k.id+'\')">카톡 알림</button>' : '') + '</div>');
     }
     var hwn = homeworkPendingCount(k.id);
     if (hwn) notices.push('<div class="dash-notice hw" onclick="openHomeworkFor(\''+k.id+'\')">📝 <b>'+esc(k.name)+'</b> 밀린 숙제 '+hwn+'개 <span class="dash-link">보기 ›</span></div>');
@@ -1826,7 +1872,7 @@ function renderDashboard(){
   var summary = '<div class="dash-summary">' + (notices.length ? notices.join("") : '<div class="dash-notice ok">✅ 지금 확인할 것이 없어요</div>') +
     (isParent() ? '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button>' : '') + '</div>';
 
-  var cards = DATA.kids.map(function(k){
+  var cards = visibleKids().map(function(k){
     var kcss = '--kc-border:'+k.color.border+';--kc-bg:'+k.color.bg+';--kc-text:'+k.color.text+';--kc-soft:'+k.color.soft;
     var items = classesForDay(k.id, dayIdx, date);
     var nextMarked = false;
@@ -2592,7 +2638,7 @@ function reqSet(field, value, rerender){ ui[field] = value; if (rerender) render
 function addRequest(){
   var text = (ui.reqText || "").trim();
   if (!text) { showToast("무엇이 필요한지 적어주세요!"); return; }
-  var kidId = isAllKids() ? ((ui.reqKidId && kidById(ui.reqKidId)) ? ui.reqKidId : DATA.kids[0].id) : ui.selectedKidId;
+  var kidId = isAllKids() ? ((ui.reqKidId && kidById(ui.reqKidId)) ? ui.reqKidId : DATA.kids[0].id) : currentKidId();
   DATA.requests[uid()] = { kidId:kidId, text:text, kind: ui.reqKind || "prep", due: ui.reqDue || "", status:"open", createdAt: Date.now(), doneDate:"" };
   ui.reqText = ""; ui.reqDue = "";
   scheduleSave(); render();
