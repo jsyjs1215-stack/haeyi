@@ -335,6 +335,11 @@ button, input { font-family: inherit; }
 .day-list.in-section { padding-bottom:4px; }
 .kid-lane-bg { position:absolute; top:0; bottom:0; pointer-events:none; opacity:0.35; }
 .paste-cta { width:100%; border:1.5px dashed #2E93E0; background:#F4F9FE; color:#0E4A78; border-radius:12px; padding:10px; font-size:13px; font-weight:800; cursor:pointer; font-family:inherit; }
+.paste-lines { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow-y:auto; }
+.paste-line { display:flex; align-items:flex-start; gap:8px; text-align:left; border:1.5px solid #E8DFCB; background:#fff; color:#9C9282; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; cursor:pointer; line-height:1.4; }
+.paste-line.on { border-color:#14B8A0; background:#EAFBF6; color:#0B5C50; font-weight:700; }
+.paste-check { width:18px; height:18px; flex-shrink:0; border-radius:5px; border:1.5px solid #D8CBAE; display:flex; align-items:center; justify-content:center; font-size:12px; background:#fff; }
+.paste-line.on .paste-check { background:#14B8A0; border-color:#14B8A0; color:#fff; }
 .paste-raw { width:100%; border:1.5px solid #CFE6FA; border-radius:12px; padding:10px 12px; font-size:16px; font-family:inherit; line-height:1.45; outline:none; resize:vertical; }
 /* 🎒 준비물 탭 */
 .dash-notice.req { background:#EAF6FF; color:#0E4A78; cursor:pointer; }
@@ -2279,21 +2284,53 @@ function guessClassTitle(kidId, text){
   });
   return { title:best, score:bestScore };
 }
-function extractHomeworkText(text){
-  var lines = text.replace(/\r/g, "").split("\n").map(function(s){ return s.trim(); });
-  var keep = function(l){ return l && !PASTE_SKIP_LINE.test(l) && !PASTE_STOP.test(l); };
-  var at = -1;
-  for (var i = 0; i < lines.length; i++) { if (/숙제|과제|homework|\bhw\b/i.test(lines[i])) { at = i; break; } }
-  if (at === -1) return lines.filter(keep).join("\n");
-  var out = [];
-  var first = lines[at].replace(/^.*?(숙제|과제|homework|hw)\s*(는|은)?\s*[:：\-]?\s*/i, "").trim();
-  if (first && !/^(안내|알려|공지|입니다|드립니다|있습니다)/.test(first) && !PASTE_STOP.test(first)) out.push(first);
-  for (var j = at + 1; j < lines.length; j++) {
-    if (!lines[j]) { if (out.length) break; else continue; }
-    if (PASTE_SKIP_LINE.test(lines[j]) || PASTE_STOP.test(lines[j])) break;
-    out.push(lines[j]);
+var HW_WORD = /숙제|과제|homework|\bhw\b/i;
+// "■ 진도: …", "1) 테스트 : …" 같은 항목 머리 (다른 항목이 시작되면 숙제 부분 끝)
+var FIELD_LABEL = /^[\s■□▶▷►●○◆◇※★☆\-\*•·>]*(?:\d+[.)]\s*)?([가-힣A-Za-z ]{1,10}?)\s*[:：]\s*/;
+var NON_HW_LABEL = /진도|테스트|시험|점수|성적|출결|출석|특이|수업|공지|안내|학생|이름|날짜|일시|결과|평가|코멘트|comment|태도|준비물|다음|내용|교재/i;
+// 숙제처럼 보이는 줄 (쪽수·개수·외우기 등)
+var TASK_LIKE = /p\.?\s*\d|\d+\s*(쪽|페이지|장|개|번|회|문제|단원|과)|풀(기|어)|외우|암기|읽(기|어)|써\s*오|쓰기|오답|workbook|unit|ch\.?\s*\d|lesson|page/i;
+// 원문을 줄로 나누고, 숙제로 보이는 줄을 미리 골라 둠 (화면에서 엄마가 톡톡 눌러 고칠 수 있음)
+function splitPasteLines(text){
+  var lines = [], blankBefore = [], prevBlank = false;
+  text.replace(/\r/g, "").split("\n").forEach(function(raw){
+    var l = raw.trim()
+      .replace(/^\[[^\]]{1,30}\]\s*\[(오전|오후|AM|PM)\s*\d{1,2}:\d{2}\]\s*/i, "")   // 카톡 복사 시 붙는 [이름] [오후 5:12]
+      .replace(/^(오전|오후)\s*\d{1,2}:\d{2}\s*/, "");
+    if (!l) { prevBlank = true; return; }
+    if (PASTE_SKIP_LINE.test(l) || /^[-=_~─━]{3,}$/.test(l) || /^\d{4}년\s*\d{1,2}월\s*\d{1,2}일/.test(l)) return;
+    lines.push(l); blankBefore.push(prevBlank); prevBlank = false;
+  });
+  var sel = lines.map(function(){ return false; });
+  var shown = lines.slice();
+  var found = false;
+  for (var i = 0; i < lines.length; i++) {
+    if (!HW_WORD.test(lines[i])) continue;
+    found = true;
+    var f = lines[i].match(FIELD_LABEL), rest;
+    if (f && HW_WORD.test(f[1])) rest = lines[i].slice(f[0].length).trim();
+    else rest = lines[i].replace(/^.*?(숙제|과제|homework|hw)\s*(는|은|입니다)?\s*[:：\-]?\s*/i, "").trim();
+    if (rest && !/^(안내|알려|공지|입니다|드립니다|있습니다|확인|검사|완료|체크)/.test(rest) && !PASTE_STOP.test(rest)) { shown[i] = rest; sel[i] = true; }
+    for (var j = i + 1; j < lines.length; j++) {
+      if (blankBefore[j] && sel.slice(i, j).some(Boolean)) break;            // 빈 줄 → 숙제 블록 끝
+      if (PASTE_STOP.test(lines[j])) break;                                 // 인사말 → 끝
+      var g = lines[j].match(FIELD_LABEL);
+      // 다른 항목(진도·테스트…)이 시작되면 끝. "단어: 20개"처럼 숙제 세부 항목은 계속
+      if (g && !HW_WORD.test(g[1]) && (NON_HW_LABEL.test(g[1]) || !TASK_LIKE.test(lines[j]))) break;
+      if (HW_WORD.test(lines[j])) break;                                    // 다음 숙제 줄은 바깥 반복에서 처리
+      sel[j] = true;
+    }
   }
-  return out.join("\n") || lines.filter(keep).join("\n");
+  if (!found || !sel.some(Boolean)) {
+    // '숙제'라는 말이 없으면 숙제처럼 보이는 줄만, 그것도 없으면 인사말 뺀 전부
+    var task = lines.map(function(l){ return TASK_LIKE.test(l) && !PASTE_STOP.test(l); });
+    sel = task.some(Boolean) ? task : lines.map(function(l){ return !PASTE_STOP.test(l); });
+  }
+  return { lines:shown, sel:sel };
+}
+function extractHomeworkText(text){
+  var s = splitPasteLines(text);
+  return s.lines.filter(function(l, i){ return s.sel[i]; }).join("\n");
 }
 // 그 수업의 가장 최근 수업일 (오늘 수업이 있으면 오늘)
 function lastSessionDate(kidId, title){
@@ -2327,7 +2364,9 @@ function parsePastedMessage(raw, from){
   // 자동 입력해도 될 만큼 확실한지: 숙제 단어가 있고, 수업을 찾았고, 아이가 분명할 때
   var hasKeyword = /숙제|과제|homework|\bhw\b/i.test(text);
   var sure = !!(hasKeyword && title && guess.score >= 5 && (kidHits.length === 1 || guess.score >= 7 || DATA.kids.length === 1));
-  return { kidId:kidId, title:title, date: title ? lastSessionDate(kidId, title) : todayStr(), hw: extractHomeworkText(text), sure:sure };
+  var split = splitPasteLines(text);
+  return { kidId:kidId, title:title, date: title ? lastSessionDate(kidId, title) : todayStr(), sure:sure,
+    lines: split.lines, sel: split.sel, hw: split.lines.filter(function(l, i){ return split.sel[i]; }).join("\n") };
 }
 // 분석 결과를 숙제 칸에 넣고 안내 문구를 돌려줌 (itemId: 같은 알림이 두 번 들어와도 중복 안 되게)
 function applyParsedHomework(p, itemId){
@@ -2415,6 +2454,12 @@ function analyzePaste(){
   ui.pasteModal.parsed = parsePastedMessage(raw);
   render();
 }
+function togglePasteLine(i){
+  var p = ui.pasteModal.parsed;
+  p.sel[i] = !p.sel[i];
+  p.hw = p.lines.filter(function(l, k){ return p.sel[k]; }).join("\n");
+  render();
+}
 function pasteSet(field, value, rerender){
   var p = ui.pasteModal.parsed;
   p[field] = value;
@@ -2457,7 +2502,13 @@ function renderPasteModal(){
       }).join("") + '<button class="req-chip'+(!p.title?" on":"")+'" onclick="pasteSet(\'title\',\'\',true)">기타</button></div>' +
       (!p.title ? '<div class="field-hint">수업을 못 찾았어요. 맞는 수업을 눌러 주세요.</div>' : '') + '</div>' +
       '<div class="field"><label>수업 날짜</label><input type="date" value="'+esc(p.date)+'" onchange="pasteSet(\'date\',this.value)"></div>' +
-      '<div class="field"><label>숙제 내용 (고칠 수 있어요)</label><textarea class="paste-raw" rows="5" oninput="ui.pasteModal.parsed.hw=this.value">'+esc(p.hw)+'</textarea></div>' +
+      (p.lines && p.lines.length > 1
+        ? '<div class="field"><label>숙제인 줄만 골라주세요 <span style="font-weight:400">(눌러서 넣기/빼기)</span></label><div class="paste-lines">' +
+          p.lines.map(function(l, i){
+            return '<button class="paste-line'+(p.sel[i]?" on":"")+'" onclick="togglePasteLine('+i+')"><span class="paste-check">'+(p.sel[i]?"✓":"")+'</span><span>'+esc(l)+'</span></button>';
+          }).join("") + '</div></div>'
+        : '') +
+      '<div class="field"><label>들어갈 숙제 내용 (직접 고쳐도 돼요)</label><textarea class="paste-raw" rows="4" oninput="ui.pasteModal.parsed.hw=this.value">'+esc(p.hw)+'</textarea></div>' +
       (m.inboxId ? '<div class="field-hint" style="margin:-4px 0 10px">📨 휴대폰에서 자동으로 받은 학원 알림이에요. 숙제가 아니면 <b>버리기</b>를 누르세요.</div>' : '') +
       '<div class="modal-actions">' +
       (m.inboxId
