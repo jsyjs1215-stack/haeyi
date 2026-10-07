@@ -2723,15 +2723,19 @@ function renderSuppliesView(kid){
       .filter(function(r){ return r.status === "done" && (r.source === "class" || !r.doneDate || r.doneDate >= cutoff); });
     var head = isAllKids() ? kidSectionHead(k, open.length ? '<span class="ks-extra" style="color:#0E4A78">요청 '+open.length+'개</span>' : '<span class="ks-extra">✓ 다 챙겼어요</span>') : '';
     return head +
-      (open.length ? '<div class="req-list">'+open.map(renderRequestRow).join("")+'</div>' : '<div class="hw-tab-empty">필요한 게 생기면 위에 적어주세요 🙂</div>') +
+      (open.length ? '<div class="req-list">'+open.map(renderRequestRow).join("")+'</div>'
+        : '<div class="hw-tab-empty">'+(isParent() ? "아이가 요청한 준비물이 없어요" : "필요한 게 생기면 위에 적어주세요 🙂")+'</div>') +
       (done.length ? '<div class="section-label" style="margin-top:6px;color:#8A7F6E">완료 (최근 7일)</div><div class="req-list">'+done.map(renderRequestRow).join("")+'</div>' : '');
   }).join("");
 
   var kcss = '--kc-border:'+kid.color.border+';--kc-bg:'+kid.color.bg+';--kc-text:'+kid.color.text+';--kc-soft:'+kid.color.soft;
   return '<div class="panel" style="'+kcss+'">' +
-    '<div class="week-toolbar"><span class="week-label">🎒 '+esc(kid.name)+'의 준비물·요청</span>' +
+    '<div class="week-toolbar"><span class="week-label">🎒 '+(isParent() ? (isAllKids() ? "아이들이" : esc(kid.name)+(iEyo(kid.name)==="이에요"?"이":"가"))+' 요청한 준비물' : esc(kid.name)+'의 준비물·요청')+'</span>' +
     '<button class="today-btn" onclick="shareRequests(\''+kidsShown.map(function(k){ return k.id; }).join(",")+'\')">카톡으로 보내기</button></div>' +
-    form + sections + '<div style="height:12px"></div></div>';
+    (isParent()
+      ? '<div class="field-hint" style="padding:10px 14px 0">아이들이 아이 화면에서 적은 요청이에요. 챙기거나 사 주면 <b>챙겼어요 ✓ / 샀어요 ✓</b>를 눌러주세요.</div>'
+      : form) +
+    sections + '<div style="height:12px"></div></div>';
 }
 
 function renderPaymentView(kid){
