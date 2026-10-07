@@ -372,6 +372,8 @@ button, input { font-family: inherit; }
 .req-list { display:flex; flex-direction:column; gap:7px; padding:4px 14px 6px; }
 .req-item { display:flex; align-items:center; gap:9px; background:#FBF9F4; border-left:4px solid #2E93E0; border-radius:13px; padding:10px 10px 10px 12px; }
 .req-item.buy { border-left-color:#F5427D; background:#FFF6F9; }
+.req-item.food { border-left-color:#F4A200; background:#FFF8EA; }
+.req-item.etc { border-left-color:#7B61FF; background:#F6F3FF; }
 .req-item.overdue { border-left-color:#E5383B; background:#FDEAEA; }
 .req-item.done { border-left-color:#D8CBAE; opacity:0.6; }
 .req-item.done .req-text { text-decoration:line-through; }
@@ -1759,7 +1761,7 @@ function renderHeader(){
     '<div class="brand-row">'+titleHtml+'</div>' +
     '<p class="brand-sub">'+(parent
       ? "👩 부모 화면 — 숙제 입력, 일정·휴일 관리, 등록현황을 할 수 있어요."
-      : "👧 아이 화면 — 오늘 일정, 출석, 숙제 확인, 준비물 요청을 할 수 있어요.")+'</p>' +
+      : "👧 아이 화면 — 오늘 일정, 출석, 숙제 확인, 엄마·아빠한테 요청(준비물·먹고 싶은 것 등)을 할 수 있어요.")+'</p>' +
     '<div class="sync-row"><span id="sync-badge" class="sync-badge sync-connecting">연결 중...</span>' +
     (parent ? '<button class="share-btn" onclick="copyShareLink()">공유 링크 복사</button>' +
       '<button class="share-btn" style="background:#8A7F6E" onclick="resetSyncSetup()">동기화 주소 재설정</button>' : '') +
@@ -1797,16 +1799,17 @@ function renderBody(){
   if (!kid) return "";
   if (!isParent() && !KID_VIEWS[ui.view]) ui.view = "today";   // 아이 화면에선 부모 전용 탭으로 못 감
   var hwCount = viewKidIds(kid).reduce(function(s, id){ return s + homeworkPendingCount(id); }, 0);
-  var rc = viewKidIds(kid).reduce(function(s, id){ return s + openRequestCount(id); }, 0);
+  // 부모 화면에선 어떤 아이를 보고 있든 전체 요청 수를 보여줌 (놓치지 않게)
+  var rc = (isParent() ? DATA.kids.map(function(k){ return k.id; }) : viewKidIds(kid)).reduce(function(s, id){ return s + openRequestCount(id); }, 0);
   var hwTab = function(label){ return '<button class="view-btn'+(ui.view==="homework"?" active":"")+(hwCount?" tab-alert":"")+'" onclick="goToView(\'homework\')">'+label+(hwCount?' <span class="tab-badge">'+hwCount+'</span>':'')+'</button>'; };
-  var supTab = function(label){ return '<button class="view-btn'+(ui.view==="supplies"?" active":"")+'" onclick="goToView(\'supplies\')">'+label+(rc?' <span class="tab-badge" style="background:#2E93E0">'+rc+'</span>':'')+'</button>'; };
+  var supTab = function(label){ return '<button class="view-btn'+(ui.view==="supplies"?" active":"")+(rc && isParent() && ui.view!=="supplies"?" tab-alert":"")+'" onclick="goToView(\'supplies\')">'+label+(rc?' <span class="tab-badge">'+rc+'</span>':'')+'</button>'; };
   var switchHtml = isParent()
     ? '<div class="view-switch parent">' +
-        tabBtn('today','🏠 오늘') + hwTab('📝 숙제 입력·관리') + supTab('🎒 준비물 요청') +
+        tabBtn('today','🏠 오늘') + hwTab('📝 숙제 입력·관리') + supTab('🙋 아이 요청') +
         tabBtn('attendance','✅ 출석') + tabBtn('detail','🗓 일정 관리') + tabBtn('overview','📅 달력·휴일') + tabBtn('payment','💰 등록현황') +
       '</div>'
     : '<div class="view-switch">' +
-        tabBtn('today','🏠 오늘') + tabBtn('attendance','✅ 출석체크') + hwTab('📝 숙제') + supTab('🎒 준비물') +
+        tabBtn('today','🏠 오늘') + tabBtn('attendance','✅ 출석체크') + hwTab('📝 숙제') + supTab('🙋 요청하기') +
         tabBtn('detail','🗓 시간표') + tabBtn('overview','📅 달력') +
       '</div>';
 
@@ -1864,8 +1867,8 @@ function renderDashboard(){
     var hwn = homeworkPendingCount(k.id);
     if (hwn) notices.push('<div class="dash-notice hw" onclick="openHomeworkFor(\''+k.id+'\')">📝 <b>'+esc(k.name)+'</b> 밀린 숙제 '+hwn+'개 <span class="dash-link">보기 ›</span></div>');
     var reqs = openRequestItems(k.id);
-    if (reqs.length) notices.push('<div class="dash-notice req" onclick="openSuppliesFor(\''+k.id+'\')">🎒 <b>'+esc(k.name)+'</b> 준비물·요청 '+reqs.length+'개 — ' +
-      reqs.slice(0,3).map(function(r){ return (r.kind==="buy"?"🛒":"")+esc(r.text); }).join(", ")+(reqs.length>3?" 외":"")+' <span class="dash-link">보기 ›</span></div>');
+    if (reqs.length) notices.push('<div class="dash-notice req" onclick="openSuppliesFor(\''+k.id+'\')">🙋 <b>'+esc(k.name)+'</b> 요청 '+reqs.length+'개 — ' +
+      reqs.slice(0,3).map(function(r){ return reqKind(r).icon+esc(r.text); }).join(", ")+(reqs.length>3?" 외":"")+' <span class="dash-link">보기 ›</span></div>');
   });
   var reviewN = inboxReviewIds().length;
   if (reviewN && isParent()) notices.unshift('<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+reviewN+'개 — 숙제인지 앱이 확실히 몰라서 기다리고 있어요 <span class="dash-link">확인 ›</span></div>');
@@ -2603,7 +2606,14 @@ function renderPasteModal(){
     '<h3>📋 학원 알림으로 숙제 넣기<button class="modal-close" onclick="closePasteModal()">✕</button></h3>' + body + '</div></div>';
 }
 
-/* ---------- 🎒 준비물 탭: 아이들이 준비물·사줄 물건을 요청하고, 부모님이 챙기면 체크 ---------- */
+/* ---------- 🙋 요청 탭: 아이들이 준비물·필요한 것·먹고 싶은 것 등을 요청하고, 부모님이 해주면 체크 ---------- */
+var REQ_KINDS = {
+  prep: { icon:"🎒", label:"준비물",     done:"챙겼어요 ✓", ph:"예: 색종이, 리코더, 체육복" },
+  buy:  { icon:"🛒", label:"필요해요",   done:"샀어요 ✓",   ph:"예: 실내화, 색연필, 공책" },
+  food: { icon:"🍕", label:"먹고 싶어요", done:"해줬어요 ✓", ph:"예: 떡볶이, 딸기, 치킨" },
+  etc:  { icon:"💬", label:"기타",       done:"했어요 ✓",   ph:"예: 주말에 공원 가고 싶어요" }
+};
+function reqKind(r){ return REQ_KINDS[r.kind] || REQ_KINDS.prep; }
 var CLASS_SUPPLY_DAYS = 7;   // 수업 줄에 적힌 준비물은 앞뒤 7일 것만 모아서 보여줌
 function requestItems(kidId){
   return Object.keys(DATA.requests).map(function(id){ return Object.assign({ id:id, source:"request" }, DATA.requests[id]); })
@@ -2661,10 +2671,10 @@ function shareRequests(kidIdsStr){
   var lines = kidIdsStr.split(",").map(function(kidId){
     var k = kidById(kidId), items = openRequestItems(kidId);
     if (!k || !items.length) return "";
-    return k.name+": "+items.map(function(r){ return (r.kind==="buy"?"🛒":"🎒")+r.text+(r.due?"("+formatMD(r.due)+"까지)":""); }).join(", ");
+    return k.name+": "+items.map(function(r){ return reqKind(r).icon+r.text+(r.due?"("+formatMD(r.due)+"까지)":""); }).join(", ");
   }).filter(Boolean);
   if (!lines.length) { showToast("요청한 준비물이 없어요."); return; }
-  shareText("🎒 [준비물·사주세요 요청]\n"+lines.join("\n"));
+  shareText("🙋 [아이들 요청]\n"+lines.join("\n"));
 }
 function reqDueLabel(r){
   if (!r.due) return "언제든";
@@ -2676,14 +2686,14 @@ function reqDueLabel(r){
 }
 function renderRequestRow(r){
   var done = r.status === "done";
-  var icon = r.source === "class" ? "📚" : (r.kind === "buy" ? "🛒" : "🎒");
+  var icon = r.source === "class" ? "📚" : reqKind(r).icon;
   var meta = r.source === "class"
     ? esc(r.classTitle)+' 수업('+formatMD(r.date)+')에서 적음'
     : reqDueLabel(r) + (r.createdAt ? ' · '+formatMD(dateToStr(new Date(r.createdAt)))+' 요청' : '') + (done && r.doneDate ? ' · '+formatMD(r.doneDate)+' 완료' : '');
   var toggle = r.source === "class" ? "toggleSuppliesDone('"+r.classId+"','"+r.date+"')" : "toggleRequest('"+r.id+"')";
-  var label = done ? "되돌리기" : (r.kind === "buy" ? "샀어요 ✓" : "챙겼어요 ✓");
+  var label = done ? "되돌리기" : reqKind(r).done;
   var overdue = !done && r.due && r.due < todayStr();
-  return '<div class="req-item'+(done?" done":"")+(overdue?" overdue":"")+(r.kind==="buy"&&!done?" buy":"")+'">' +
+  return '<div class="req-item'+(done?" done":"")+(overdue?" overdue":"")+(!done && r.source !== "class" ? " "+(REQ_KINDS[r.kind] ? r.kind : "prep") : "")+'">' +
     '<span class="req-icon">'+icon+'</span>' +
     '<div class="req-body"><div class="req-text">'+esc(r.text)+'</div><div class="req-meta">'+meta+'</div></div>' +
     '<button class="req-done-btn'+(done?" undo":"")+'" onclick="'+toggle+'">'+label+'</button>' +
@@ -2702,10 +2712,11 @@ function renderSuppliesView(kid){
         return '<button class="req-chip" style="'+(on?'background:'+k.color.border+';border-color:'+k.color.border+';color:#fff':'')+'" onclick="reqSet(\'reqKidId\',\''+k.id+'\',true)">'+esc(k.name)+'</button>';
       }).join("") + '</div>' : '') +
     '<div class="req-chips">' +
-      '<button class="req-chip'+(kind==="prep"?" on":"")+'" onclick="reqSet(\'reqKind\',\'prep\',true)">🎒 준비물</button>' +
-      '<button class="req-chip'+(kind==="buy"?" on":"")+'" onclick="reqSet(\'reqKind\',\'buy\',true)">🛒 사주세요</button>' +
+      Object.keys(REQ_KINDS).map(function(kk){
+        return '<button class="req-chip'+(kind===kk?" on":"")+'" onclick="reqSet(\'reqKind\',\''+kk+'\',true)">'+REQ_KINDS[kk].icon+' '+REQ_KINDS[kk].label+'</button>';
+      }).join("") +
     '</div>' +
-    '<input class="req-input" placeholder="'+(kind==="buy"?"예: 실내화, 색연필 24색, 공책":"예: 색종이, 리코더, 체육복")+'" value="'+esc(ui.reqText||"")+'" oninput="reqSet(\'reqText\',this.value)" onkeydown="if(event.key===\'Enter\')addRequest()">' +
+    '<input class="req-input" placeholder="'+(REQ_KINDS[kind]||REQ_KINDS.prep).ph+'" value="'+esc(ui.reqText||"")+'" oninput="reqSet(\'reqText\',this.value)" onkeydown="if(event.key===\'Enter\')addRequest()">' +
     '<div class="req-chips" style="align-items:center">' +
       '<span class="field-hint" style="margin:0">언제까지?</span>' +
       '<button class="req-chip small'+(!due?" on":"")+'" onclick="reqSet(\'reqDue\',\'\',true)">언제든</button>' +
@@ -2724,16 +2735,16 @@ function renderSuppliesView(kid){
     var head = isAllKids() ? kidSectionHead(k, open.length ? '<span class="ks-extra" style="color:#0E4A78">요청 '+open.length+'개</span>' : '<span class="ks-extra">✓ 다 챙겼어요</span>') : '';
     return head +
       (open.length ? '<div class="req-list">'+open.map(renderRequestRow).join("")+'</div>'
-        : '<div class="hw-tab-empty">'+(isParent() ? "아이가 요청한 준비물이 없어요" : "필요한 게 생기면 위에 적어주세요 🙂")+'</div>') +
+        : '<div class="hw-tab-empty">'+(isParent() ? "아이들 요청이 없어요" : "필요한 게 생기면 위에 적어주세요 🙂")+'</div>') +
       (done.length ? '<div class="section-label" style="margin-top:6px;color:#8A7F6E">완료 (최근 7일)</div><div class="req-list">'+done.map(renderRequestRow).join("")+'</div>' : '');
   }).join("");
 
   var kcss = '--kc-border:'+kid.color.border+';--kc-bg:'+kid.color.bg+';--kc-text:'+kid.color.text+';--kc-soft:'+kid.color.soft;
   return '<div class="panel" style="'+kcss+'">' +
-    '<div class="week-toolbar"><span class="week-label">🎒 '+(isParent() ? (isAllKids() ? "아이들이" : esc(kid.name)+(iEyo(kid.name)==="이에요"?"이":"가"))+' 요청한 준비물' : esc(kid.name)+'의 준비물·요청')+'</span>' +
+    '<div class="week-toolbar"><span class="week-label">🙋 '+(isParent() ? (isAllKids() ? "아이들이" : esc(kid.name)+(iEyo(kid.name)==="이에요"?"이":"가"))+' 요청한 것' : esc(kid.name)+'의 요청')+'</span>' +
     '<button class="today-btn" onclick="shareRequests(\''+kidsShown.map(function(k){ return k.id; }).join(",")+'\')">카톡으로 보내기</button></div>' +
     (isParent()
-      ? '<div class="field-hint" style="padding:10px 14px 0">아이들이 아이 화면에서 적은 요청이에요. 챙기거나 사 주면 <b>챙겼어요 ✓ / 샀어요 ✓</b>를 눌러주세요.</div>'
+      ? '<div class="field-hint" style="padding:10px 14px 0">아이들이 아이 화면에서 적은 요청이에요. 해주면 오른쪽 <b>✓ 버튼</b>을 눌러주세요.</div>'
       : form) +
     sections + '<div style="height:12px"></div></div>';
 }
