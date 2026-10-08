@@ -352,6 +352,20 @@ button, input { font-family: inherit; }
 .me-bar { display:flex; align-items:center; gap:7px; margin-top:14px; padding:9px 14px; border-radius:14px; background:var(--kc-soft); border-left:5px solid var(--kc-border); color:var(--kc-text); font-size:15px; }
 .me-bar b { font-family:'Jua', sans-serif; font-size:18px; font-weight:400; }
 .me-change { margin-left:auto; border:none; background:none; color:#9C9282; font-size:11.5px; text-decoration:underline; cursor:pointer; font-family:inherit; }
+/* 숙제 마감 상태: todo(여유)·dueToday(오늘까지)·late(기한 지남)·done */
+.hw-row.hw-todo { background:#FFF7E5; }
+.hw-tab-item.todo { border-left-color:#F4A200; background:#FFF8EA; }
+.hw-tab-due { font-size:11.5px; font-weight:700; margin-top:3px; color:#7A4E00; }
+.hw-tab-due.late { color:#C0392B; }
+.hw-tab-due.dueToday { color:#D35400; }
+.hw-tab-due.done { color:#0B5C50; }
+.dash-hw-head { padding:9px 12px 3px; font-size:12px; font-weight:800; color:var(--kc-text); border-top:1px dashed #E8DFCB; }
+.dash-hw { display:flex; align-items:center; gap:8px; padding:7px 12px; }
+.dash-hw:last-child { padding-bottom:11px; }
+.dash-hw-text { font-size:13px; color:#4A4238; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dash-hw.late .dash-hw-text b { color:#C0392B; }
+.dash-btn.hw-late { background:#E5383B; border-color:#E5383B; color:#fff; }
+.dash-btn.hw-dueToday, .dash-btn.hw-todo { background:#fff; border-color:#14B8A0; color:#0B5C50; }
 .paste-lines { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow-y:auto; }
 .paste-line { display:flex; align-items:flex-start; gap:8px; text-align:left; border:1.5px solid #E8DFCB; background:#fff; color:#9C9282; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; cursor:pointer; line-height:1.4; }
 .paste-line.on { border-color:#14B8A0; background:#EAFBF6; color:#0B5C50; font-weight:700; }
@@ -930,9 +944,32 @@ function classAccentColor(title, kidId){
   var m = idx().accent[kidId];
   return (m && m[title]) || CLASS_ACCENTS[0];
 }
-function dayHasPendingHomework(kidId, dateStr){
-  var items = classesForDay(kidId, mondayIndex(dateStr), dateStr);
-  return items.some(function(c){ return !isClosedOn(c, dateStr) && hwStatus(DATA.homework[c.id+"__"+dateStr], c.hwDefault) === "pending"; });
+/* ---------- 숙제 마감 = 같은 학원의 다음 수업일 ----------
+   월요일 숙제 → 다음 수업(예: 목요일)까지는 '해야 할 숙제', 그날이 지나도 완료 안 누르면 '미완료(기한 지남)' */
+var HW_LOOKBACK_DAYS = 30;
+// 실제로 숙제가 있는 기록인지: 내용을 적었거나, 숙제 있음/완료를 직접 눌렀을 때만 (그냥 수업만 있었던 날은 숙제로 안 셈)
+function isRealHomework(rec){
+  return !!(rec && ((rec.text && String(rec.text).trim()) || rec.status === "pending" || rec.status === "done" || rec.done));
+}
+function nextSessionDate(kidId, title, dateStr){
+  for (var i = 1; i <= 28; i++) {
+    var d = shiftDate(dateStr, i);
+    if (classesForDay(kidId, mondayIndex(d), d).some(function(c){ return c.title === title && !isClosedOn(c, d); })) return d;
+  }
+  return shiftDate(dateStr, 7);
+}
+// todo: 아직 여유 / dueToday: 오늘 수업 전까지 / late: 기한 지남(미완료) / done: 완료
+function hwState(due, done){
+  if (done) return "done";
+  var t = todayStr();
+  return t < due ? "todo" : (t === due ? "dueToday" : "late");
+}
+function hwDueLabel(h){
+  var dd = new Date(h.due+"T00:00:00"), wd = DAYS[(dd.getDay()+6)%7];
+  if (h.state === "done") return "완료";
+  if (h.state === "late") return "⚠️ "+formatMD(h.due)+"("+wd+")까지였어요";
+  if (h.state === "dueToday") return "🔥 오늘 수업 전까지!";
+  return formatMD(h.due)+"("+wd+") 수업까지";
 }
 function getHomeworkList(kidId, daysBack, daysForward){
   var today = todayStr();
@@ -943,22 +980,39 @@ function getHomeworkList(kidId, daysBack, daysForward){
     classesForDay(kidId, dayIdx, d).forEach(function(c){
       if (isClosedOn(c, d)) return;
       var hw = DATA.homework[c.id+"__"+d];
-      var st = hwStatus(hw, c.hwDefault);
+      var st = realHwStatus(hw);
       if (st === "none") return;
-      results.push({ source:"class", classId:c.id, title:c.title, date:d, text:(hw?hw.text:""), status:st, accent:classAccentColor(c.title, kidId) });
+      var due = nextSessionDate(kidId, c.title, d);
+      results.push({ source:"class", classId:c.id, title:c.title, date:d, due:due, state:hwState(due, st === "done"), text:(hw.text||""), status:st, accent:classAccentColor(c.title, kidId) });
     });
   }
   DATA.homeworkItems.filter(function(h){ return h.kidId === kidId && h.date <= shiftDate(today, daysForward) && h.date >= shiftDate(today, -daysBack); }).forEach(function(h){
-    results.push({ source:"manual", id:h.id, title:"직접 입력", date:h.date, text:h.text, status:h.status, accent:"#8A7F6E" });
+    var due = h.due || h.date;
+    results.push({ source:"manual", id:h.id, title:"직접 입력", date:h.date, due:due, state:hwState(due, h.status === "done"), text:h.text, status:h.status, accent:"#8A7F6E" });
   });
   results.sort(function(a,b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
   return results;
 }
+// 해야 할 숙제(아직 완료 안 한 것) — 기한 지난 것 먼저, 그다음 마감 빠른 순
+function openHomework(kidId){
+  var order = { late:0, dueToday:1, todo:2 };
+  return getHomeworkList(kidId, HW_LOOKBACK_DAYS, 0).filter(function(h){ return h.state !== "done"; })
+    .sort(function(a,b){ return (order[a.state]-order[b.state]) || (a.due < b.due ? -1 : a.due > b.due ? 1 : 0); });
+}
 function homeworkPendingCount(kidId){
   var x = idx();
-  if (x.hwCount[kidId] === undefined) x.hwCount[kidId] = getHomeworkList(kidId, 14, 0).filter(function(h){ return h.status === "pending"; }).length;
+  if (x.hwCount[kidId] === undefined) x.hwCount[kidId] = openHomework(kidId).length;
   return x.hwCount[kidId];
 }
+// 숙제 한 줄 (오늘 화면 카드용): [수학] 내용 · 마감 + 완료 버튼
+function renderHomeworkLine(h){
+  var toggle = h.source === "class" ? "toggleClassHwBinary('"+h.classId+"','"+h.date+"')" : "toggleHomeworkItemStatus('"+h.id+"')";
+  return '<div class="dash-hw '+h.state+'">' +
+    '<div class="dash-body"><div class="dash-hw-text"><b>'+esc(h.title)+'</b> '+(h.text ? esc(h.text) : '<span style="color:#B5AA96">(내용 없음)</span>')+'</div>' +
+    '<div class="dash-sub'+(h.state==="late"||h.state==="dueToday"?" warn":"")+'">'+formatMD(h.date)+' 숙제 · '+hwDueLabel(h)+'</div></div>' +
+    '<button class="dash-btn hw-'+h.state+'" onclick="'+toggle+'">'+(h.state==="late"?"미완료":"완료하기")+'</button></div>';
+}
+function homeworkLateCount(kidId){ return openHomework(kidId).filter(function(h){ return h.state === "late"; }).length; }
 function addHomeworkItem(kidId, date, text){
   if (!ui.adminUnlocked) return;
   if (!text || !text.trim()) return;
@@ -972,10 +1026,7 @@ function toggleHomeworkItemStatus(id){
 function toggleClassHwBinary(classId, date){
   var hwKey = classId+"__"+date;
   var cur = DATA.homework[hwKey] || { text:"" };
-  var cls = DATA.classes.find(function(c){ return c.id === classId; });
-  var hwDefault = cls ? cls.hwDefault : "pending";
-  var curStatus = hwStatus(cur, hwDefault);
-  var next = curStatus === "done" ? "pending" : "done";
+  var next = realHwStatus(cur) === "done" ? "pending" : "done";
   DATA.homework[hwKey] = Object.assign({}, cur, { status: next, done: next === "done" });
   scheduleSave(); render();
 }
@@ -1015,7 +1066,7 @@ function buildArrivalAlertMessage(kidId){
 function buildHomeworkAlertMessage(kidId){
   var kid = DATA.kids.find(function(k){ return k.id === kidId; });
   if (!kid) return "";
-  var hwList = getHomeworkList(kidId, 14, 0).filter(function(h){ return h.status === "pending"; });
+  var hwList = openHomework(kidId);
   if (!hwList.length) return "";
   return "📝 [숙제 확인 필요]\n"+kid.name+" 밀린 숙제 "+hwList.length+"개: "+hwList.slice(0,3).map(function(h){ return h.text || h.title; }).join(", ")+(hwList.length>3?" 외 "+(hwList.length-3)+"개":"");
 }
@@ -1482,12 +1533,16 @@ function hwStatus(hw, hwDefault){
   if (hw && hw.done) return "done";
   return hwDefault || "pending";
 }
+// 숙제 기록의 실제 상태: 기록이 없으면 'none', 내용만 적혀 있으면 'pending'
+function realHwStatus(rec){
+  if (!isRealHomework(rec)) return "none";
+  if (rec.status) return rec.status;
+  return rec.done ? "done" : "pending";
+}
 function cycleHomeworkStatus(classId, dateStr){
-  var cls = DATA.classes.find(function(c){ return c.id === classId; });
-  var hwDefault = cls ? cls.hwDefault : "pending";
   var key = classId+"__"+dateStr;
   var cur = DATA.homework[key] || { text:"" };
-  var idx = HW_CYCLE.indexOf(hwStatus(cur, hwDefault));
+  var idx = HW_CYCLE.indexOf(realHwStatus(cur));
   var next = HW_CYCLE[(idx+1) % HW_CYCLE.length];
   DATA.homework[key] = Object.assign({}, cur, { status: next, done: next === "done" });
   scheduleSave(); render();
@@ -1864,8 +1919,8 @@ function renderDashboard(){
       if (late.length) notices.push('<div class="dash-notice warn">⏰ <b>'+esc(k.name)+'</b> 출석 확인 필요 — '+late.map(function(c){ return esc(c.title)+'('+c.start+')'; }).join(", ") +
         (isParent() ? ' <button class="dash-link" onclick="shareArrivalAlert(\''+k.id+'\')">카톡 알림</button>' : '') + '</div>');
     }
-    var hwn = homeworkPendingCount(k.id);
-    if (hwn) notices.push('<div class="dash-notice hw" onclick="openHomeworkFor(\''+k.id+'\')">📝 <b>'+esc(k.name)+'</b> 밀린 숙제 '+hwn+'개 <span class="dash-link">보기 ›</span></div>');
+    var hwn = homeworkPendingCount(k.id), hwLate = homeworkLateCount(k.id);
+    if (hwn) notices.push('<div class="dash-notice '+(hwLate?"warn":"hw")+'" onclick="openHomeworkFor(\''+k.id+'\')">📝 <b>'+esc(k.name)+'</b> 해야 할 숙제 '+hwn+'개'+(hwLate?' (⚠️ 기한 지남 '+hwLate+'개)':'')+' <span class="dash-link">보기 ›</span></div>');
     var reqs = openRequestItems(k.id);
     if (reqs.length) notices.push('<div class="dash-notice req" onclick="openSuppliesFor(\''+k.id+'\')">🙋 <b>'+esc(k.name)+'</b> 요청 '+reqs.length+'개 — ' +
       reqs.slice(0,3).map(function(r){ return reqKind(r).icon+esc(r.text); }).join(", ")+(reqs.length>3?" 외":"")+' <span class="dash-link">보기 ›</span></div>');
@@ -1888,7 +1943,6 @@ function renderDashboard(){
       var att = DATA.attendance[key] || null;
       var status = attDisplayStatus(att, c.type, date);
       var hw = DATA.homework[key] || { text:"" };
-      var hwSt = hwStatus(hw, c.hwDefault), hwStyle = HW_STYLE[hwSt];
       var sup = DATA.supplies[key] || { text:"", done:false };
       var startMin = timeToMin(c.start), endMin = timeToMin(c.end);
       var tag = "";
@@ -1899,23 +1953,28 @@ function renderDashboard(){
       if (isToday && !status && startMin <= nowMin) subs += '<div class="dash-sub warn">⏰ 출석 체크가 안 됐어요</div>';
       if (dep && !status) subs += '<div class="dash-sub">🚶 '+dep+' 출발</div>';
       if (att && att.reason) subs += '<div class="dash-sub">사유: '+esc(att.reason)+'</div>';
-      if (hw.text) subs += '<div class="dash-sub">📝 '+esc(hw.text)+'</div>';
+      if (hw.text) subs += '<div class="dash-sub">📥 이날 받은 숙제: '+esc(hw.text)+'</div>';
       if (sup.text) subs += '<div class="dash-sub'+(sup.done?" done":"")+'">🎒 '+esc(sup.text)+'</div>';
       var attStyle = status ? 'background:'+ATT_STYLE[status].fill+';border-color:'+ATT_STYLE[status].fill+';color:#fff' : '';
       return '<div class="dash-row'+(status?" status-"+status:"")+'">' +
         '<span class="dash-time">'+c.start+'</span>' +
         '<div class="dash-body" onclick="openKidDay(\''+k.id+'\',\''+date+'\')"><div class="dash-title">'+esc(c.title)+tag+'</div>'+subs+'</div>' +
-        '<button class="dash-btn" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+date+'\')">'+(hwSt==="none"?"숙제X":"숙제 "+hwStyle.label)+'</button>' +
         '<button class="dash-btn att" style="'+attStyle+'" onclick="cycleAttendance(\''+c.id+'\',\''+date+'\')">'+(status||"체크")+'</button>' +
         '</div>';
     }).join("");
     var hwn = homeworkPendingCount(k.id);
+    // 해야 할 숙제: 다음 수업 전까지 계속 보이고, 그날이 지나면 '기한 지남'
+    var hwList = openHomework(k.id);
+    var hwBlock = hwList.length
+      ? '<div class="dash-hw-head">📝 해야 할 숙제</div>' + hwList.map(renderHomeworkLine).join("")
+      : '';
     return '<div class="dash-card" style="'+kcss+'">' +
       '<div class="dash-card-head"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:'+k.color.border+'"></span>' +
       '<span class="dash-kid-name">'+esc(k.name)+'</span>' +
-      (hwn ? '<span class="tab-badge" title="밀린 숙제">'+hwn+'</span>' : '') +
+      (hwn ? '<span class="tab-badge" title="해야 할 숙제">'+hwn+'</span>' : '') +
       '<button class="dash-more" onclick="openKidDay(\''+k.id+'\',\''+date+'\')">자세히 ›</button></div>' +
       (rows || '<div class="dash-empty">이 날은 일정이 없어요</div>') +
+      hwBlock +
       '</div>';
   }).join("");
 
@@ -1975,8 +2034,8 @@ function renderMonthView(kid){
       var col = chipColors(c, status);
       var pk = isAllKids() ? kidById(c.kidId) : null;
       var accent = pk ? pk.color.border : classAccentColor(c.title, c.kidId);
-      var hwSt = hwStatus(DATA.homework[c.id+"__"+cell.date], c.hwDefault);
-      var hwMark = hwSt === "pending" ? '<span class="cal-pill-hw" title="숙제 미완료"></span>' : '';
+      var hwSt = realHwStatus(DATA.homework[c.id+"__"+cell.date]);
+      var hwMark = hwSt === "pending" ? '<span class="cal-pill-hw" title="해야 할 숙제"></span>' : '';
       return '<div class="cal-pill" style="background:'+col.bg+';color:'+col.text+'"><span class="cal-pill-dot" style="background:'+accent+'"></span><span class="cal-pill-text">'+(status==="결석"?"❌":"")+esc(c.title)+'</span>'+hwMark+'</div>';
     }).join("");
     var noteHtml = notes.map(function(n){ return '<div class="cal-pill cal-pill-note" title="'+esc(n.text)+'">📌 <span class="cal-pill-text">'+esc(n.text)+'</span></div>'; }).join("");
@@ -2026,8 +2085,16 @@ function renderClassRow(c, dateForRow, hideKidTag){
   var status = attDisplayStatus(att, c.type, dateForRow);
   var hwKey = c.id+"__"+dateForRow;
   var hw = DATA.homework[hwKey] || { text:"" };
-  var hwSt = hwStatus(hw, c.hwDefault);
+  // 이날 받은 숙제: 마감은 같은 학원의 다음 수업일
+  var hwSt = realHwStatus(hw);
   var hwStyle = HW_STYLE[hwSt];
+  var hwRowCls = hwSt, hwLabel = hwSt === "none" ? "숙제 없음" : hwStyle.label;
+  if (hwSt === "pending") {
+    var hwDue = nextSessionDate(c.kidId, c.title, dateForRow), hst = hwState(hwDue, false);
+    hwRowCls = hst === "late" ? "pending" : "todo";
+    hwLabel = hst === "late" ? "미완료" : hst === "dueToday" ? "오늘까지" : formatMD(hwDue)+"까지";
+    if (hst !== "late") hwStyle = { bg:"#FFF7E5", border:"#F4A200", text:"#7A4E00" };
+  }
   var accent = classAccentColor(c.title, c.kidId);
   var sup = DATA.supplies[hwKey] || { text:"", done:false };
   var stampStyle = status ? ('background:'+ATT_STYLE[status].fill+';color:#fff;border-color:'+ATT_STYLE[status].fill) : "";
@@ -2060,12 +2127,14 @@ function renderClassRow(c, dateForRow, hideKidTag){
       ? '<div class="reason-row"><span class="mini-label">사유</span>' +
         '<input class="hw-input reason-input" placeholder="결석 사유를 적어주세요 (예: 감기, 가족여행)" value="'+esc(att.reason||"")+'" oninput="onReasonInput(\''+c.id+'\',\''+dateForRow+'\',this.value)" onblur="blurReason()" onkeydown="if(event.key===\'Enter\')this.blur()"></div>'
       : '') +
-    '<div class="hw-row hw-'+hwSt+'"><span class="mini-label">숙제</span>' +
+    '<div class="hw-row hw-'+hwRowCls+'"><span class="mini-label">숙제</span>' +
     '<span class="hw-accent-dot" style="background:'+accent+'"></span>' +
     (isParent()
       ? '<textarea class="hw-input hw-textarea" rows="1" placeholder="수업이 끝난 후 나온 숙제를 적어주세요" oninput="onHomeworkInput(\''+c.id+'\',\''+dateForRow+'\',this.value);autoGrow(this)" onblur="blurHomework()">'+esc(hw.text)+'</textarea>'
       : '<div class="hw-readonly'+(hw.text?"":" empty")+'">'+(hw.text ? esc(hw.text) : "아직 적힌 숙제가 없어요")+'</div>') +
-    '<button class="hw-stamp" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+dateForRow+'\')">'+hwStyle.label+'</button>' +
+    (isParent()
+      ? '<button class="hw-stamp" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="cycleHomeworkStatus(\''+c.id+'\',\''+dateForRow+'\')">'+hwLabel+'</button>'
+      : (hwSt !== "none" ? '<button class="hw-stamp" style="background:'+hwStyle.bg+';border-color:'+hwStyle.border+';color:'+hwStyle.text+'" onclick="toggleClassHwBinary(\''+c.id+'\',\''+dateForRow+'\')">'+(hwSt==="done"?"완료 ✓":hwLabel)+'</button>' : '')) +
     '</div>' +
     '<div class="prep-row"><span class="mini-label">준비물</span>' +
     '<button class="hw-check'+(sup.done?" done":"")+'" onclick="toggleSuppliesDone(\''+c.id+'\',\''+dateForRow+'\')">'+(sup.done?"✓":"")+'</button>' +
@@ -2277,23 +2346,28 @@ function renderHomeworkView(kid){
   var kcss = '--kc-border:'+kid.color.border+';--kc-bg:'+kid.color.bg+';--kc-text:'+kid.color.text+';--kc-soft:'+kid.color.soft;
   var list = [];
   viewKidIds(kid).forEach(function(kidId){
-    list = list.concat(getHomeworkList(kidId, 14, 0).map(function(h){ return Object.assign({ kidId:kidId }, h); }));
+    list = list.concat(getHomeworkList(kidId, HW_LOOKBACK_DAYS, 0).map(function(h){ return Object.assign({ kidId:kidId }, h); }));
   });
-  list.sort(function(a,b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
-  var pending = list.filter(function(h){ return h.status === "pending"; });
-  var done = list.filter(function(h){ return h.status === "done"; });
+  var order = { late:0, dueToday:1, todo:2 };
+  var pending = list.filter(function(h){ return h.state !== "done"; })
+    .sort(function(a,b){ return (order[a.state]-order[b.state]) || (a.due < b.due ? -1 : a.due > b.due ? 1 : 0); });
+  // 완료한 숙제는 마감이 지나고 7일까지만 보여줌
+  var doneCut = shiftDate(todayStr(), -7);
+  var done = list.filter(function(h){ return h.state === "done" && h.due >= doneCut; })
+    .sort(function(a,b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
 
   function renderItem(h){
-    var isPending = h.status === "pending";
+    var isPending = h.state !== "done", isLate = h.state === "late";
     var toggleAction = h.source === "class" ? "toggleClassHwBinary('"+h.classId+"','"+h.date+"')" : "toggleHomeworkItemStatus('"+h.id+"')";
     var delBtn = (ui.adminUnlocked && h.source === "manual") ? '<button class="closed-clear" onclick="deleteHomeworkItem(\''+h.id+'\')">삭제</button>' : "";
-    return '<div class="hw-tab-item'+(isPending?" pending":" done")+'">' +
+    return '<div class="hw-tab-item'+(isLate?" pending":isPending?" todo":" done")+'">' +
       '<div class="hw-tab-main">' +
       '<span class="hw-tab-dot" style="background:'+h.accent+'"></span>' +
       '<div class="hw-tab-body"><div class="hw-tab-date">'+formatKoreanDate(h.date)+' · '+esc(h.title)+'</div>' +
       (h.text ? '<div class="hw-tab-text">'+esc(h.text)+'</div>' : '<div class="hw-tab-text placeholder">내용이 입력되지 않았어요</div>') +
+      '<div class="hw-tab-due '+h.state+'">'+hwDueLabel(h)+'</div>' +
       '</div>' +
-      '<button class="hw-stamp" style="background:'+(isPending?HW_STYLE.pending.bg:HW_STYLE.done.bg)+';border-color:'+(isPending?HW_STYLE.pending.border:HW_STYLE.done.border)+';color:'+(isPending?HW_STYLE.pending.text:HW_STYLE.done.text)+'" onclick="'+toggleAction+'">'+(isPending?"미완료":"완료")+'</button>' +
+      '<button class="hw-stamp" style="background:'+(isPending?HW_STYLE.pending.bg:HW_STYLE.done.bg)+';border-color:'+(isPending?HW_STYLE.pending.border:HW_STYLE.done.border)+';color:'+(isPending?HW_STYLE.pending.text:HW_STYLE.done.text)+'" onclick="'+toggleAction+'">'+(isLate?"미완료":isPending?"완료하기":"완료 ✓")+'</button>' +
       '</div>' +
       (delBtn ? '<div class="hw-tab-actions">'+delBtn+'</div>' : '') +
       '</div>';
@@ -2315,9 +2389,10 @@ function renderHomeworkView(kid){
   ) : "";
 
   function sections(p, d){
-    return (p.length
-        ? '<div class="section-label" style="color:#B0342F">🔴 미완료 ('+p.length+'개)</div><div class="hw-tab-list">'+p.map(renderItem).join("")+'</div>'
-        : '<div class="hw-tab-empty">🎉 미완료 숙제가 없어요!</div>') +
+    var late = p.filter(function(h){ return h.state === "late"; }), todo = p.filter(function(h){ return h.state !== "late"; });
+    return (late.length ? '<div class="section-label" style="color:#B0342F">⚠️ 기한 지난 숙제 ('+late.length+'개)</div><div class="hw-tab-list">'+late.map(renderItem).join("")+'</div>' : '') +
+      (todo.length ? '<div class="section-label" style="color:#7A4E00">📝 해야 할 숙제 ('+todo.length+'개) <span style="font-weight:400;color:#9C9282">다음 수업 전까지</span></div><div class="hw-tab-list">'+todo.map(renderItem).join("")+'</div>' : '') +
+      (!p.length ? '<div class="hw-tab-empty">🎉 해야 할 숙제가 없어요!</div>' : '') +
       (d.length ? '<div class="section-label" style="margin-top:14px">완료됨</div><div class="hw-tab-list">'+d.map(renderItem).join("")+'</div>' : '');
   }
   var listHtml;
@@ -2326,7 +2401,7 @@ function renderHomeworkView(kid){
     listHtml = DATA.kids.map(function(k){
       var p = pending.filter(function(h){ return h.kidId === k.id; });
       var d = done.filter(function(h){ return h.kidId === k.id; });
-      return kidSectionHead(k, p.length ? '<span class="ks-extra" style="color:#B0342F">미완료 '+p.length+'개</span>' : '<span class="ks-extra">✓ 다 했어요</span>') + sections(p, d);
+      return kidSectionHead(k, p.length ? '<span class="ks-extra" style="color:#B0342F">할 숙제 '+p.length+'개</span>' : '<span class="ks-extra">✓ 다 했어요</span>') + sections(p, d);
     }).join("");
   } else {
     listHtml = sections(pending, done);
@@ -2338,7 +2413,7 @@ function renderHomeworkView(kid){
       ? '<div style="padding:12px 14px 0;display:flex;flex-direction:column;gap:6px">' +
         (inboxReviewIds().length ? '<div class="dash-notice req" onclick="openInboxReview()">📨 확인할 학원 알림 '+inboxReviewIds().length+'개 <span class="dash-link">확인 ›</span></div>' : '') +
         '<button class="paste-cta" onclick="openPasteModal()">📋 학원 문자·카톡 붙여넣어서 숙제 넣기</button></div>'
-      : '<div class="field-hint" style="padding:10px 14px 0">숙제를 다 하면 <b>미완료</b> 버튼을 눌러 <b>완료</b>로 바꿔주세요 ✓</div>') +
+      : '<div class="field-hint" style="padding:10px 14px 0">숙제는 <b>다음 수업 전까지</b> 하면 돼요. 다 하면 <b>완료하기</b>를 눌러주세요 ✓</div>') +
     addForm + listHtml +
     '</div>';
 }
