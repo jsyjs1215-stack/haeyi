@@ -366,6 +366,7 @@ button, input { font-family: inherit; }
 .dash-hw.late .dash-hw-text b { color:#C0392B; }
 .dash-btn.hw-late { background:#E5383B; border-color:#E5383B; color:#fff; }
 .dash-btn.hw-dueToday, .dash-btn.hw-todo { background:#fff; border-color:#14B8A0; color:#0B5C50; }
+.app-ver { font-size:10px; color:#C7BCA3; }
 .paste-lines { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow-y:auto; }
 .paste-line { display:flex; align-items:flex-start; gap:8px; text-align:left; border:1.5px solid #E8DFCB; background:#fff; color:#9C9282; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; cursor:pointer; line-height:1.4; }
 .paste-line.on { border-color:#14B8A0; background:#EAFBF6; color:#0B5C50; font-weight:700; }
@@ -539,8 +540,33 @@ function normalizeFbUrl(u){
   if (u.slice(-1) !== "/") u += "/";
   return u;
 }
+// 앱 버전: 기기마다 예전 화면(캐시)이 남아 있는지 확인용으로 상단에 작게 표시
+var APP_VERSION = "2026.10.08";
+// 응답 없이 멈춘 요청 때문에 동기화가 영영 멈추지 않도록 15초가 지나면 실패로 처리하고 다음에 다시 시도
+var FETCH_TIMEOUT_MS = 15000, lastOkAt = 0;
+function fetchT(url, opts){
+  opts = opts || {};
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  if (ctrl) opts.signal = ctrl.signal;
+  var timer = null;
+  var timeout = new Promise(function(_, reject){
+    timer = setTimeout(function(){
+      if (ctrl) ctrl.abort();
+      reject(new Error("서버 응답 없음(15초) — 인터넷 연결이나 휴대폰 보안 앱이 막고 있을 수 있어요"));
+    }, FETCH_TIMEOUT_MS);
+  });
+  return Promise.race([fetch(url, opts), timeout]).then(function(res){
+    clearTimeout(timer);
+    if (res.ok) lastOkAt = Date.now();
+    return res;
+  }, function(e){
+    clearTimeout(timer);
+    if (e && e.name === "AbortError") throw new Error("서버 응답 없음(15초) — 인터넷 연결이나 휴대폰 보안 앱이 막고 있을 수 있어요");
+    throw e;
+  });
+}
 function remoteGet(){
-  return fetch(fbUrl + "family-data.json", { cache:"no-store" }).then(function(res){
+  return fetchT(fbUrl + "family-data.json", { cache:"no-store" }).then(function(res){
     if (!res.ok) throw new Error("데이터 조회 실패 (status " + res.status + ")");
     return res.text();
   }).then(function(text){
@@ -550,13 +576,13 @@ function remoteGet(){
 }
 // 전체 데이터 대신 updatedAt 숫자 하나만 받아와서 바뀌었는지 확인 (폴링 트래픽 절감)
 function remoteGetTs(){
-  return fetch(fbUrl + "family-data/updatedAt.json", { cache:"no-store" }).then(function(res){
+  return fetchT(fbUrl + "family-data/updatedAt.json", { cache:"no-store" }).then(function(res){
     if (!res.ok) throw new Error("데이터 조회 실패 (status " + res.status + ")");
     return res.json();
   }).then(function(v){ return Number(v) || 0; });
 }
 function remoteSet(text){
-  return fetch(fbUrl + "family-data.json?print=silent", {
+  return fetchT(fbUrl + "family-data.json?print=silent", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: text
@@ -566,7 +592,7 @@ function remoteSet(text){
 }
 // 바뀐 항목만 전송 — 다른 기기가 동시에 체크한 출석·숙제를 덮어쓰지 않음
 function remotePatch(text){
-  return fetch(fbUrl + "family-data.json?print=silent", {
+  return fetchT(fbUrl + "family-data.json?print=silent", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: text
@@ -730,7 +756,7 @@ function pollOnce(){
   remoteGetTs().then(function(ts){
     if (hasLocalChanges()) { doSave(); return; }   // 못 보낸 변경분이 있으면 doSave가 병합까지 처리
     if (ts === lastSeenTs) {
-      if (syncStatus === "error") { syncStatus = "synced"; renderSyncBadge(); }
+      syncStatus = "synced"; lastSyncError = ""; renderSyncBadge();   // '○분 전 확인' 갱신
       return;
     }
     return remoteGet().then(function(text){
@@ -1743,8 +1769,16 @@ function renderSyncBadge(){
     error: ["동기화 연결 끊김", "sync-warn"]
   };
   var m = map[syncStatus] || map.connecting;
-  el.textContent = m[0];
+  var ago = "";
+  if (syncStatus === "synced" && lastOkAt) {
+    var sec = Math.round((Date.now() - lastOkAt) / 1000);
+    ago = sec < 60 ? " · 방금 확인" : " · " + Math.round(sec / 60) + "분 전 확인";
+  }
+  el.textContent = m[0] + ago;
   el.className = "sync-badge " + m[1];
+  el.style.cursor = "pointer";
+  el.title = "눌러서 지금 동기화";
+  el.onclick = syncNow;
   if (detailEl) {
     if ((syncStatus === "local-only" || syncStatus === "error") && lastSyncError) {
       detailEl.innerHTML = '<span style="color:#B0342F">원인: '+esc(lastSyncError)+'</span> · <button onclick="retrySync()" style="border:none;background:none;color:#0E4A78;text-decoration:underline;cursor:pointer;font-size:11px;padding:0">다시 연결</button>' +
@@ -1754,6 +1788,13 @@ function renderSyncBadge(){
       detailEl.style.display = "none";
     }
   }
+}
+// 배지를 누르면 멈춰 있던 상태를 풀고 바로 서버와 다시 맞춤
+function syncNow(){
+  saving = false; inboxBusy = false; initialRunning = false;
+  syncStatus = "connecting"; renderSyncBadge();
+  if (!initialDone) { initialSync(); return; }
+  if (hasLocalChanges()) doSave(); else pollOnce();
 }
 function retrySync(){
   lastSyncError = "";
@@ -1817,7 +1858,7 @@ function renderHeader(){
     '<p class="brand-sub">'+(parent
       ? "👩 부모 화면 — 숙제 입력, 일정·휴일 관리, 등록현황을 할 수 있어요."
       : "👧 아이 화면 — 오늘 일정, 출석, 숙제 확인, 엄마·아빠한테 요청(준비물·먹고 싶은 것 등)을 할 수 있어요.")+'</p>' +
-    '<div class="sync-row"><span id="sync-badge" class="sync-badge sync-connecting">연결 중...</span>' +
+    '<div class="sync-row"><span id="sync-badge" class="sync-badge sync-connecting">연결 중...</span><span class="app-ver">v'+APP_VERSION+'</span>' +
     (parent ? '<button class="share-btn" onclick="copyShareLink()">공유 링크 복사</button>' +
       '<button class="share-btn" style="background:#8A7F6E" onclick="resetSyncSetup()">동기화 주소 재설정</button>' : '') +
     '</div>' +
@@ -2552,7 +2593,7 @@ var inboxBusy = false, inboxSeen = {};   // inboxSeen: 지우기가 서버에 �
 function checkInbox(){
   if (inboxBusy || !fbUrl || !initialDone || !baseline) return;
   inboxBusy = true;
-  fetch(fbUrl + "family-data/smsInbox.json", { cache:"no-store" }).then(function(res){
+  fetchT(fbUrl + "family-data/smsInbox.json", { cache:"no-store" }).then(function(res){
     if (!res.ok) throw new Error("status " + res.status);
     return res.json();
   }).then(function(map){
